@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { DAYS, SECTIONS, ITEMS, ITEM_DAY, ITEM_SEC, ITEM_DATED, ITEM_CORE, TOTAL, LAST_DAY, itemTitle, sectionTitle } from "@/lib/plan";
+import { DAYS, SECTIONS, ITEMS, ITEM_CORE, TOTAL, LAST_DAY, itemTitle } from "@/lib/plan";
 import { STRINGS, WEEKDAYS } from "@/lib/i18n";
 import SolutionsModal from "@/components/SolutionsModal";
 import SettingsModal from "@/components/SettingsModal";
@@ -23,6 +23,20 @@ export default function Tracker({ user }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showToday, setShowToday] = useState(true);
+  const [theme, setTheme] = useState("light");
+  const [preFilter, setPreFilter] = useState("all"); // "Already done" difficulty filter
+
+  // pick up the theme the pre-paint script already applied
+  useEffect(() => {
+    try { setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"); } catch {}
+  }, []);
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try { document.documentElement.setAttribute("data-theme", next); localStorage.setItem("ctt-theme", next); } catch {}
+      return next;
+    });
+  };
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -159,29 +173,16 @@ export default function Tracker({ user }) {
     <>
       <div className="topbar">
         <div className="topbar__in">
-          <div className="topbar__row1">
-            <span className="brand"><b>{t.appName}</b></span>
-            <div className="topbar__corner">
-              <button className="tbtn langtoggle" onClick={toggleLang} title={t.langBtn} aria-label={t.langBtn}>
-                <span aria-hidden="true">🌐</span><span className="langtoggle__label">{t.langBtn}</span>
-              </button>
-              <div className="userchip" title={user?.email || ""}>
-                {user?.image ? <img src={user.image} alt="" /> : <span className="userchip__dot" />}
-                <button className="tbtn signout" onClick={() => signOut()}>{t.signOut}</button>
-              </div>
-            </div>
+          <span className="brand"><b>{t.appName}</b></span>
+          <div className="topbar__bar"><div className="topbar__fill" style={{ width: pct + "%" }} /></div>
+          <span className="topbar__stat">{t.statDone} <b>{doneCount}</b>/{TOTAL} · {t.statReview} <b>{hardIds.length}</b></span>
+          <div className="topbar__actions">
+            <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
+            <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
+            <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
+            <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
           </div>
-          <div className="topbar__row2">
-            <div className="topbar__bar"><div className="topbar__fill" style={{ width: pct + "%" }} /></div>
-            <span className="topbar__stat">{t.statDone} <b>{doneCount}</b>/{TOTAL} · {t.statReview} <b>{hardIds.length}</b></span>
-            <div className="topbar__actions">
-              <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
-              <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
-              <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
-              <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
-            </div>
-            <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
-          </div>
+          <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
         </div>
       </div>
 
@@ -255,33 +256,6 @@ export default function Tracker({ user }) {
           </div>
         </section>
 
-        <section className="queue">
-          <div className="queue__head">
-            <h2>{t.reviewQueue}</h2>
-            <span className={"queue__count" + (hardIds.length ? "" : " zero")}>{hardIds.length}</span>
-            <span className="queue__sub">{t.reviewSub}</span>
-          </div>
-          <div className="queue__box">
-            {hardIds.length === 0 ? (
-              <div className="queue__empty">{t.reviewEmpty}</div>
-            ) : (
-              hardIds.map((id) => {
-                const i = ITEMS[id]; const st = state.items[id];
-                return (
-                  <div className="qrow" key={id}>
-                    <span className="qrow__day">{ITEM_DATED[id] ? "Day " + ITEM_DAY[id] : sectionTitle(ITEM_SEC[id], lang)}</span>
-                    <input type="checkbox" className="cbox" checked={!!st.done} onChange={() => toggleDone(id)} aria-label="done" />
-                    {i.url
-                      ? <a className="qrow__t" href={i.url} target="_blank" rel="noopener noreferrer">{itemTitle(i, lang)} <span className="ext">↗</span></a>
-                      : <span className="qrow__t">{itemTitle(i, lang)}</span>}
-                    <DiffButtons st={st} onSet={(d) => setDiff(id, d)} />
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-
         <main>
           {DAYS.map((d) => {
             const sec = SECTIONS[d.sec];
@@ -306,6 +280,7 @@ export default function Tracker({ user }) {
                   openNotes={openNotes} setOpenNotes={setOpenNotes}
                   toggleDone={toggleDone} setDiff={setDiff} setNote={setNote} setDayNote={setDayNote}
                   onOpenSolutions={(pid) => setSolFor(pid)}
+                  preFilter={preFilter} setPreFilter={setPreFilter}
                 />
               </FragmentWithKey>
             );
@@ -321,6 +296,19 @@ export default function Tracker({ user }) {
           <div className="reset"><button onClick={resetAll}>{t.resetTitle}</button></div>
           <div className="credit">{t.builtBy} <a href="https://davidseheonchang.xyz" target="_blank" rel="noopener noreferrer">David Seheon Chang <span className="ext">↗</span></a></div>
         </footer>
+      </div>
+
+      <div className="dock">
+        <button className="dockbtn dockbtn--icon" onClick={toggleTheme} aria-label={t.themeToggle} title={t.themeToggle}>
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
+        <button className="dockbtn" onClick={toggleLang} aria-label={t.langBtn} title={t.langBtn}>
+          <span aria-hidden="true">🌐</span><span className="dockbtn__lbl">{t.langBtn}</span>
+        </button>
+        <div className="dock__user" title={user?.email || ""}>
+          {user?.image ? <img src={user.image} alt="" /> : <span className="userchip__dot" />}
+          <button className="dockbtn" onClick={() => signOut()}>{t.signOut}</button>
+        </div>
       </div>
 
       {solFor && (
@@ -361,10 +349,13 @@ function DiffButtons({ st, onSet }) {
   );
 }
 
-function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, openNotes, setOpenNotes, toggleDone, setDiff, setNote, setDayNote, onOpenSolutions }) {
+function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, openNotes, setOpenNotes, toggleDone, setDiff, setNote, setDayNote, onOpenSolutions, preFilter, setPreFilter }) {
   const done = d.items.filter((i) => state.items[i.id]?.done).length;
   const tot = d.items.length;
   const full = done === tot;
+  const shown = d.pre && preFilter !== "all"
+    ? d.items.filter((i) => (state.items[i.id]?.diff || "") === preFilter)
+    : d.items;
   return (
     <div className={"day" + (full ? " done" : "") + (isToday ? " today" : "") + (collapsed ? " collapsed" : "")} id={"day-" + d.key}>
       <button className="dhead" onClick={onCollapse}>
@@ -381,7 +372,22 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
       </button>
       {!collapsed && (
         <div className="dbody">
-          {d.items.map((i) => (
+          {d.pre && (
+            <div className="prefilter" role="group" aria-label={t.filterLabel}>
+              <span className="prefilter__lbl">{t.filterLabel}</span>
+              {["all", "e", "o", "h"].map((k) => {
+                const count = k === "all" ? d.items.length : d.items.filter((i) => state.items[i.id]?.diff === k).length;
+                return (
+                  <button key={k} className={"pfbtn" + (preFilter === k ? " on" : "")}
+                    onClick={() => setPreFilter(k)} aria-pressed={preFilter === k}>
+                    {k === "all" ? <span>{t.filterAll}</span> : <i className={"ld " + k} />}
+                    <span className="pfcount">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {shown.map((i) => (
             <ItemRow key={i.id} i={i} t={t} lang={lang} st={state.items[i.id]}
               solCount={(state.solutions[i.id] || []).length}
               noteOpen={!!openNotes[i.id]}
@@ -389,6 +395,7 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
               onDone={() => toggleDone(i.id)} onDiff={(x) => setDiff(i.id, x)} onNote={(v) => setNote(i.id, v)}
               onSolutions={() => onOpenSolutions(i.id)} />
           ))}
+          {d.pre && shown.length === 0 && <div className="today__empty">{t.filterEmpty}</div>}
           {!d.pre && (
             <div className="daynote">
               <label>{t.dayNoteLabel}</label>
@@ -404,11 +411,14 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
 
 function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNote, onDone, onDiff, onNote, onSolutions }) {
   const isProb = i.type === "p";
-  const lv = isProb ? i.lv : "T";
+  // "implement …" tasks are code you write, so they get difficulty + solutions too
+  const codeTask = i.type === "t" && /implement/i.test(i.t?.en || "");
+  const showControls = isProb || codeTask;
+  const lv = isProb ? i.lv : (codeTask ? "C" : "T");
   return (
     <div className={"item" + (st?.done ? " checked" : "")}>
       <input type="checkbox" className="cbox" checked={!!st?.done} onChange={onDone} aria-label="done" />
-      <span className={"lv " + lv}>{isProb ? i.lv : "✓"}</span>
+      <span className={"lv " + lv}>{isProb ? i.lv : (codeTask ? "{}" : "✓")}</span>
       <div className="item__main">
         {i.url
           ? <a className="item__t" href={i.url} target="_blank" rel="noopener noreferrer">{itemTitle(i, lang)}<span className="ext">↗</span></a>
@@ -416,12 +426,12 @@ function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNote, onDone, onD
         {i.nc && <span className="ncbadge">{t.ncFree}</span>}
       </div>
       <div className="item__right">
-        {isProb && (
+        {showControls && (
           <button className={"solbtn" + (solCount ? " has" : "")} onClick={onSolutions} title={t.solutionsBtn}>
             {"</>"}{solCount ? <span className="solcnt">{solCount}</span> : null}
           </button>
         )}
-        {isProb && <DiffButtons st={st} onSet={onDiff} />}
+        {showControls && <DiffButtons st={st} onSet={onDiff} />}
         <button className={"notebtn" + (st?.note?.trim() ? " has" : "")} onClick={onToggleNote} title={t.noteBtn}>✎</button>
       </div>
       {noteOpen && (
