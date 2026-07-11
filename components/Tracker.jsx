@@ -1,18 +1,16 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { DAYS, PHASES, ITEMS, ITEM_DAY, TOTAL, PRE_DONE, LAST_DAY, itemTitle } from "@/lib/plan";
+import { DAYS, SECTIONS, ITEMS, ITEM_DAY, ITEM_SEC, ITEM_DATED, ITEM_CORE, TOTAL, LAST_DAY, itemTitle, sectionTitle } from "@/lib/plan";
 import { STRINGS, WEEKDAYS } from "@/lib/i18n";
 import SolutionsModal from "@/components/SolutionsModal";
 import SettingsModal from "@/components/SettingsModal";
 import SummaryModal from "@/components/SummaryModal";
 
 const isoToday = () => new Date().toISOString().slice(0, 10);
-const emptyState = () => {
-  const items = {};
-  PRE_DONE.forEach((id) => (items[id] = { done: true, diff: null, note: "" }));
-  return { start: isoToday(), lang: "en", items, dayNotes: {}, solutions: {}, summary: "", summaryDate: "" };
-};
+// Fresh accounts start completely empty — nothing pre-checked.
+const emptyState = () => ({ start: isoToday(), lang: "en", items: {}, dayNotes: {}, solutions: {}, summary: "", summaryDate: "" });
+const FIRST_COMPANY_KEY = DAYS.find((d) => d.company)?.key;
 
 export default function Tracker({ user }) {
   const [state, setState] = useState(null);
@@ -24,6 +22,7 @@ export default function Tracker({ user }) {
   const [solFor, setSolFor] = useState(null); // problem id
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [showToday, setShowToday] = useState(true);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -73,7 +72,7 @@ export default function Tracker({ user }) {
   const t = STRINGS[lang];
 
   // ── derived ──
-  const doneCount = useMemo(() => state ? Object.keys(state.items).filter((id) => ITEMS[id] && state.items[id].done).length : 0, [state]);
+  const doneCount = useMemo(() => state ? Object.keys(state.items).filter((id) => ITEMS[id] && ITEM_CORE[id] && state.items[id].done).length : 0, [state]);
   const hardIds = useMemo(() => state ? Object.keys(state.items).filter((id) => ITEMS[id] && state.items[id].diff === "h") : [], [state]);
   const pct = TOTAL ? Math.round((doneCount / TOTAL) * 100) : 0;
 
@@ -93,6 +92,16 @@ export default function Tracker({ user }) {
       ? `${base.getMonth() + 1}월 ${base.getDate()}일 (${wd})`
       : `${wd}, ${base.toLocaleString("en-US", { month: "short" })} ${base.getDate()}`;
   }, [state, lang]);
+
+  // ── Today + spaced review (1 / 3 / 5 days ago) ──
+  const datedDay = useCallback((n) => DAYS.find((d) => d.dated && d.n === n), []);
+  const todayPos = Math.max(1, Math.min(LAST_DAY, todayIndex));
+  const todayDay = datedDay(todayPos);
+  const reviewGroups = [1, 3, 5]
+    .map((off) => ({ off, n: todayPos - off }))
+    .filter((g) => g.n >= 1)
+    .map((g) => ({ ...g, day: datedDay(g.n) }))
+    .filter((g) => g.day);
 
   // ── item mutations ──
   const getItem = (s, id) => { if (!s.items[id]) s.items[id] = { done: false, diff: null, note: "" }; return s.items[id]; };
@@ -119,8 +128,18 @@ export default function Tracker({ user }) {
   };
   const toggleAll = () => {
     const next = !allCollapsed; setAllCollapsed(next);
-    const c = {}; DAYS.forEach((d) => { c[d.pre ? "pre" : d.n] = next; }); setCollapsed(c);
+    const c = {}; DAYS.forEach((d) => { c[d.key] = next; }); setCollapsed(c);
   };
+
+  // Reusable item row (shared by the Today panel).
+  const renderItem = (i) => (
+    <ItemRow key={i.id} i={i} t={t} lang={lang} st={state.items[i.id]}
+      solCount={(state.solutions[i.id] || []).length}
+      noteOpen={!!openNotes[i.id]}
+      onToggleNote={() => setOpenNotes((o) => ({ ...o, [i.id]: !o[i.id] }))}
+      onDone={() => toggleDone(i.id)} onDiff={(x) => setDiff(i.id, x)} onNote={(v) => setNote(i.id, v)}
+      onSolutions={() => setSolFor(i.id)} />
+  );
 
   // ── render ──
   if (loadErr)
@@ -135,33 +154,78 @@ export default function Tracker({ user }) {
     );
   if (!state) return <div className="splash"><div className="spinner big" /></div>;
 
-  let lastPh = -1;
+  let lastSec = null;
   return (
     <>
-      <button className="langfab" onClick={toggleLang} aria-label={t.langBtn} title={t.langBtn}>
-        <span className="langfab__globe" aria-hidden="true">🌐</span>
-        <span className="langfab__label">{t.langBtn}</span>
-      </button>
       <div className="topbar">
         <div className="topbar__in">
-          <span className="brand"><b>{t.appName}</b></span>
-          <div className="topbar__bar"><div className="topbar__fill" style={{ width: pct + "%" }} /></div>
-          <span className="topbar__stat">{t.statDone} <b>{doneCount}</b>/{TOTAL} · {t.statReview} <b>{hardIds.length}</b></span>
-          <div className="topbar__actions">
-            <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
-            <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
-            <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
-            <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
+          <div className="topbar__row1">
+            <span className="brand"><b>{t.appName}</b></span>
+            <div className="topbar__corner">
+              <button className="tbtn langtoggle" onClick={toggleLang} title={t.langBtn} aria-label={t.langBtn}>
+                <span aria-hidden="true">🌐</span><span className="langtoggle__label">{t.langBtn}</span>
+              </button>
+              <div className="userchip" title={user?.email || ""}>
+                {user?.image ? <img src={user.image} alt="" /> : <span className="userchip__dot" />}
+                <button className="tbtn signout" onClick={() => signOut()}>{t.signOut}</button>
+              </div>
+            </div>
           </div>
-          <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
-          <div className="userchip" title={user?.email || ""}>
-            {user?.image ? <img src={user.image} alt="" /> : <span className="userchip__dot" />}
-            <button className="tbtn" onClick={() => signOut()}>{t.signOut}</button>
+          <div className="topbar__row2">
+            <div className="topbar__bar"><div className="topbar__fill" style={{ width: pct + "%" }} /></div>
+            <span className="topbar__stat">{t.statDone} <b>{doneCount}</b>/{TOTAL} · {t.statReview} <b>{hardIds.length}</b></span>
+            <div className="topbar__actions">
+              <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
+              <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
+              <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
+              <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
+            </div>
+            <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
           </div>
         </div>
       </div>
 
       <div className="wrap">
+        <section className="today">
+          <button className="today__head" onClick={() => setShowToday((v) => !v)} aria-expanded={showToday}>
+            <span className="today__badge">{t.todayTitle}</span>
+            <span className="today__sub">
+              {todayIndex < 1
+                ? t.todayNotStarted(dayDate(1))
+                : <>{t.dayLabel} {todayPos}{todayDay ? <> · {todayDay.topic[lang]}</> : null}</>}
+            </span>
+            <span className="caret" style={{ transform: showToday ? "" : "rotate(-90deg)" }}>▾</span>
+          </button>
+          {showToday && (
+            <div className="today__body">
+              {todayIndex < 1 ? (
+                <p className="today__empty">{t.todayNotStarted(dayDate(1))}</p>
+              ) : (
+                <>
+                  <div className="today__study">
+                    <h3 className="today__h">{t.studyToday}</h3>
+                    {todayDay?.items.map(renderItem)}
+                  </div>
+                  <div className="today__review">
+                    <h3 className="today__h">{t.reviewToday}</h3>
+                    <p className="today__hint">{t.reviewSpacedHint}</p>
+                    {reviewGroups.length === 0 ? (
+                      <p className="today__empty">{todayPos >= LAST_DAY ? t.todayAllReviewed : t.todayNothingReview}</p>
+                    ) : (
+                      reviewGroups.map((g) => (
+                        <div className="today__grp" key={g.off}>
+                          <div className="today__grplbl">{t.agoLabel(g.off)} · {t.dayLabel} {g.n} · {g.day.topic[lang]}</div>
+                          {g.day.items.filter((i) => i.type === "p").map(renderItem)}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
         <section className="hero">
           <p className="hero__k">{t.tagline}</p>
           <h1>{t.heroTitle}</h1>
@@ -205,7 +269,7 @@ export default function Tracker({ user }) {
                 const i = ITEMS[id]; const st = state.items[id];
                 return (
                   <div className="qrow" key={id}>
-                    <span className="qrow__day">Day {ITEM_DAY[id]}</span>
+                    <span className="qrow__day">{ITEM_DATED[id] ? "Day " + ITEM_DAY[id] : sectionTitle(ITEM_SEC[id], lang)}</span>
                     <input type="checkbox" className="cbox" checked={!!st.done} onChange={() => toggleDone(id)} aria-label="done" />
                     {i.url
                       ? <a className="qrow__t" href={i.url} target="_blank" rel="noopener noreferrer">{itemTitle(i, lang)} <span className="ext">↗</span></a>
@@ -220,21 +284,24 @@ export default function Tracker({ user }) {
 
         <main>
           {DAYS.map((d) => {
-            const phaseHeader = d.ph !== lastPh ? (lastPh = d.ph, (
-              <div className="phase" key={"ph" + d.ph}>
-                <span className="phase__n">{typeof PHASES[d.ph].n === "string" ? PHASES[d.ph].n : PHASES[d.ph].n[lang]}</span>
-                <h2>{PHASES[d.ph].t[lang]}</h2>
-                <span className="phase__span">{PHASES[d.ph].span[lang]}</span>
+            const sec = SECTIONS[d.sec];
+            const header = d.sec !== lastSec ? (lastSec = d.sec, (
+              <div className={"phase" + (sec.company ? " company" : "")} key={"sec-" + d.sec}>
+                <span className="phase__n">{typeof sec.n === "string" ? sec.n : sec.n[lang]}</span>
+                <h2>{sec.t[lang]}</h2>
+                <span className="phase__span">{sec.span[lang]}</span>
               </div>
             )) : null;
+            const dc = d.pre || !!d.company; // optional sections start collapsed
             return (
-              <FragmentWithKey key={d.pre ? "pre" : "d" + d.n}>
-                {phaseHeader}
+              <FragmentWithKey key={d.key}>
+                {d.key === FIRST_COMPANY_KEY && <div className="companyintro">{t.companyIntro}</div>}
+                {header}
                 <DayCard
                   d={d} t={t} lang={lang} state={state}
-                  isToday={!d.pre && todayIndex === d.n}
-                  collapsed={collapsed[d.pre ? "pre" : d.n] ?? !!d.pre}
-                  onCollapse={() => setCollapsed((c) => ({ ...c, [d.pre ? "pre" : d.n]: !(c[d.pre ? "pre" : d.n] ?? !!d.pre) }))}
+                  isToday={d.dated && todayIndex === d.n}
+                  collapsed={collapsed[d.key] ?? dc}
+                  onCollapse={() => setCollapsed((c) => ({ ...c, [d.key]: !(c[d.key] ?? dc) }))}
                   dayDate={dayDate}
                   openNotes={openNotes} setOpenNotes={setOpenNotes}
                   toggleDone={toggleDone} setDiff={setDiff} setNote={setNote} setDayNote={setDayNote}
@@ -298,16 +365,15 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
   const done = d.items.filter((i) => state.items[i.id]?.done).length;
   const tot = d.items.length;
   const full = done === tot;
-  const key = d.pre ? "pre" : d.n;
   return (
-    <div className={"day" + (full ? " done" : "") + (isToday ? " today" : "") + (collapsed ? " collapsed" : "")} id={d.pre ? "day-pre" : "day-" + d.n}>
+    <div className={"day" + (full ? " done" : "") + (isToday ? " today" : "") + (collapsed ? " collapsed" : "")} id={"day-" + d.key}>
       <button className="dhead" onClick={onCollapse}>
         {d.pre
           ? <div className="dnum pre"><small>{t.doneLabel}</small>✓</div>
           : <div className="dnum"><small>{t.dayLabel}</small>{String(d.n).padStart(2, "0")}</div>}
         <div className="dmeta">
           <div className="dhead__topic">{d.topic[lang]} {isToday && <span className="todaytag">{t.today}</span>}</div>
-          {!d.pre && <div className="dhead__date">{dayDate(d.n)}</div>}
+          {d.dated && <div className="dhead__date">{dayDate(d.n)}</div>}
           {d.hint && <div className="dhead__hint">{d.hint[lang]}</div>}
         </div>
         <div className={"dprog" + (full ? " full" : "")}><b>{done}</b>/{tot}</div>
@@ -326,8 +392,8 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
           {!d.pre && (
             <div className="daynote">
               <label>{t.dayNoteLabel}</label>
-              <textarea value={state.dayNotes[d.n] || ""} placeholder={t.dayNotePh}
-                onChange={(e) => setDayNote(d.n, e.target.value)} rows={2} />
+              <textarea value={state.dayNotes[d.key] || ""} placeholder={t.dayNotePh}
+                onChange={(e) => setDayNote(d.key, e.target.value)} rows={2} />
             </div>
           )}
         </div>

@@ -12,15 +12,9 @@ export default function LoginGate() {
     } catch {}
   }, []);
   const t = STRINGS[lang];
-  const toggle = () => {
-    const nl = lang === "en" ? "ko" : "en";
-    setLang(nl);
-    try { localStorage.setItem("ctt-lang", nl); } catch {}
-  };
   return (
     <div className="gate">
       <div className="gate__card">
-        <button className="tbtn gate__lang" onClick={toggle}>{t.langBtn}</button>
         <p className="hero__k">{t.tagline}</p>
         <h1>{t.loginTitle}</h1>
         <p className="gate__body">{t.loginBody}</p>
