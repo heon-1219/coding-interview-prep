@@ -36,6 +36,9 @@ export default function LoginGate() {
           </svg>
           {t.signIn}
         </button>
+        <div className="gate__credit">
+          {t.builtBy} <a href="https://davidseheonchang.xyz" target="_blank" rel="noopener noreferrer">David Seheon Chang ↗</a>
+        </div>
       </div>
     </div>
   );

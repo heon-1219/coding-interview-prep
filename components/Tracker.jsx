@@ -138,6 +138,10 @@ export default function Tracker({ user }) {
   let lastPh = -1;
   return (
     <>
+      <button className="langfab" onClick={toggleLang} aria-label={t.langBtn} title={t.langBtn}>
+        <span className="langfab__globe" aria-hidden="true">🌐</span>
+        <span className="langfab__label">{t.langBtn}</span>
+      </button>
       <div className="topbar">
         <div className="topbar__in">
           <span className="brand"><b>{t.appName}</b></span>
@@ -148,7 +152,6 @@ export default function Tracker({ user }) {
             <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
             <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
             <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
-            <button className="tbtn" onClick={toggleLang}>{t.langBtn}</button>
           </div>
           <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
           <div className="userchip" title={user?.email || ""}>
@@ -249,6 +252,7 @@ export default function Tracker({ user }) {
           · {t.foot3}<br />
           · {t.foot4}
           <div className="reset"><button onClick={resetAll}>{t.resetTitle}</button></div>
+          <div className="credit">{t.builtBy} <a href="https://davidseheonchang.xyz" target="_blank" rel="noopener noreferrer">David Seheon Chang <span className="ext">↗</span></a></div>
         </footer>
       </div>
 

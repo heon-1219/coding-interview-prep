@@ -35,10 +35,20 @@ input,textarea,select{font-family:inherit}
 .gate__google{width:100%;justify-content:center;padding:12px;font-size:15px}
 .gate__lang{position:absolute;top:14px;right:14px}
 
+/* floating language toggle — pinned top-right, always visible while scrolling */
+.langfab{position:fixed;top:10px;right:max(14px,calc((100vw - 920px) / 2 + 14px));z-index:40;
+  display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-strong);
+  background:var(--surface);color:var(--ink-soft);font-size:12.5px;font-weight:600;
+  padding:7px 13px;border-radius:99px;min-height:34px;box-shadow:var(--shadow);transition:.15s}
+.langfab:hover{border-color:var(--accent);color:var(--accent)}
+.langfab:active{transform:translateY(1px)}
+.langfab__globe{font-size:14px;line-height:1}
+
 /* topbar */
 .topbar{position:sticky;top:0;z-index:20;background:rgba(237,240,245,.88);
   backdrop-filter:saturate(160%) blur(10px);border-bottom:1px solid var(--line)}
-.topbar__in{max-width:920px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+/* right padding reserves room so the sign-out chip never slides under .langfab */
+.topbar__in{max-width:920px;margin:0 auto;padding:10px 118px 10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand{font-weight:700;letter-spacing:-.02em;font-size:14px;white-space:nowrap}
 .brand b{color:var(--accent)}
 .topbar__bar{flex:1 1 120px;min-width:100px;height:7px;border-radius:99px;background:var(--line-strong);overflow:hidden}
@@ -201,6 +211,14 @@ footer .reset{margin-top:10px}
 footer .reset button{border:1px solid var(--line-strong);background:var(--surface);
   color:var(--ink-faint);font-size:12px;padding:6px 11px;border-radius:8px}
 footer .reset button:hover{border-color:var(--hard);color:var(--hard)}
+.credit{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);
+  font-size:12px;color:var(--ink-faint);letter-spacing:.01em}
+.credit a{color:var(--ink-soft);font-weight:600;text-decoration:none}
+.credit a:hover{color:var(--accent)}
+.credit .ext{font-weight:400;color:var(--ink-faint);font-size:11px}
+.gate__credit{margin-top:18px;text-align:center;font-size:11.5px;color:var(--ink-faint)}
+.gate__credit a{color:var(--ink-soft);font-weight:600;text-decoration:none}
+.gate__credit a:hover{color:var(--accent)}
 
 /* modal */
 .modal{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:5vh 16px}
@@ -259,7 +277,9 @@ footer .reset button:hover{border-color:var(--hard);color:var(--hard)}
 @media (max-width:600px){
   body{font-size:14.5px}
   .wrap{padding:0 12px}
-  .topbar__in{padding:8px 12px;gap:8px}
+  .langfab{top:8px;right:12px;padding:8px;gap:0}
+  .langfab__label{display:none}
+  .topbar__in{padding:8px 56px 8px 12px;gap:8px}
   .topbar__bar{order:5;flex:1 1 100%}
   .userchip img{width:24px;height:24px}
   .hero{padding:20px 16px;margin-top:14px}
