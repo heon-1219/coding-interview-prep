@@ -1,5 +1,6 @@
 import "./globals.css";
 import Providers from "@/components/Providers";
+import OpenInBrowser from "@/components/OpenInBrowser";
 
 export const metadata = {
   title: "Coding Test Tracker",
@@ -16,6 +17,7 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <body>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        <OpenInBrowser />
         <Providers>{children}</Providers>
       </body>
     </html>
