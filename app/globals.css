@@ -392,3 +392,15 @@ footer .reset button:active{box-shadow:var(--sh-in-sm)}
   .day{scroll-margin-top:150px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+/* ── Pace (behind / on-track / ahead) ─────────────────────────────────── */
+.pacepill{flex:none;display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;
+  font-size:12px;font-weight:800;letter-spacing:.2px;box-shadow:var(--sh-in-sm);white-space:nowrap}
+.pacepill.ontrack,.pacepill.done{color:var(--easy);background:var(--easy-soft)}
+.pacepill.behind{color:var(--hard);background:var(--hard-soft)}
+.pacepill.ahead{color:var(--accent);background:var(--accent-soft)}
+.pace{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.pace__est{font-size:12.5px;color:var(--ink-soft);font-weight:600}
+.pace__hint{margin:2px 0 12px;padding:10px 14px;border-radius:var(--radius-sm);line-height:1.55;
+  font-size:13px;font-weight:600;color:var(--hard);background:var(--hard-soft);box-shadow:var(--sh-in-sm)}
+.pace__hint.ahead{color:var(--easy);background:var(--easy-soft)}

@@ -31,14 +31,72 @@ export default function SolutionsModal({ t, problem, lang, solutions, onChange, 
     commit(next); setActive(Math.max(0, Math.min(active, next.length - 1)));
   };
 
-  const onTab = (e) => {
-    if (e.key !== "Tab") return;
-    e.preventDefault();
+  // Code-editor behavior: auto-closing pairs, auto-indent, Tab/Shift+Tab.
+  // Only touches the keystroke being typed — stored solution text is never rewritten.
+  const PAIRS = { "(": ")", "[": "]", "{": "}", '"': '"', "'": "'", "`": "`" };
+  const QUOTES = ['"', "'", "`"];
+  const IND = "    ";
+  const onCode = (e) => {
     const ta = e.target;
     const { selectionStart: s, selectionEnd: en, value } = ta;
-    const next = value.slice(0, s) + "    " + value.slice(en);
-    patch(active, { code: next });
-    requestAnimationFrame(() => { ta.selectionStart = ta.selectionEnd = s + 4; });
+    const apply = (nextVal, selS, selE = selS) => {
+      e.preventDefault();
+      patch(active, { code: nextVal });
+      requestAnimationFrame(() => { ta.selectionStart = selS; ta.selectionEnd = selE; });
+    };
+    const before = value.slice(0, s), after = value.slice(en);
+    const prevCh = value[s - 1], nextCh = value[en];
+
+    if (e.key === "Tab") {
+      if (e.shiftKey || value.slice(s, en).includes("\n")) {
+        // indent / outdent every selected line
+        const ls = value.lastIndexOf("\n", s - 1) + 1;
+        const lines = value.slice(ls, en).split("\n");
+        let dFirst = 0, dTotal = 0;
+        const out = lines.map((ln, i) => {
+          if (e.shiftKey) {
+            const rm = Math.min(IND.length, (ln.match(/^ */)[0]).length);
+            if (i === 0) dFirst = -rm;
+            dTotal -= rm;
+            return ln.slice(rm);
+          }
+          if (i === 0) dFirst = IND.length;
+          dTotal += IND.length;
+          return IND + ln;
+        }).join("\n");
+        return apply(value.slice(0, ls) + out + value.slice(en), Math.max(ls, s + dFirst), en + dTotal);
+      }
+      return apply(before + IND + after, s + IND.length);
+    }
+
+    if (e.key === "Enter") {
+      // keep current indent; deepen after an opener or a trailing ":" (Python)
+      const ls = value.lastIndexOf("\n", s - 1) + 1;
+      const line = value.slice(ls, s);
+      const indent = (line.match(/^[ \t]*/) || [""])[0];
+      const opened = s === en && "([{".includes(prevCh);
+      const deeper = indent + (opened || /:\s*$/.test(line) ? IND : "");
+      if (opened && nextCh === PAIRS[prevCh])
+        return apply(before + "\n" + deeper + "\n" + indent + after, s + 1 + deeper.length);
+      return apply(before + "\n" + deeper + after, s + 1 + deeper.length);
+    }
+
+    if (e.key === "Backspace" && s === en && prevCh && PAIRS[prevCh] === nextCh)
+      return apply(value.slice(0, s - 1) + value.slice(s + 1), s - 1); // delete empty pair
+
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+
+    if (s !== en && PAIRS[e.key])
+      return apply(before + e.key + value.slice(s, en) + PAIRS[e.key] + after, s + 1, en + 1); // wrap selection
+
+    if (s === en) {
+      if ((")]}".includes(e.key) || QUOTES.includes(e.key)) && nextCh === e.key)
+        { e.preventDefault(); ta.selectionStart = ta.selectionEnd = s + 1; return; } // type over closer
+      if ("([{".includes(e.key))
+        return apply(before + e.key + PAIRS[e.key] + after, s + 1);
+      if (QUOTES.includes(e.key) && (!nextCh || /[\s)\]},;:]/.test(nextCh)) && !(prevCh && /[\w"'`]/.test(prevCh)))
+        return apply(before + e.key + e.key + after, s + 1);
+    }
   };
 
   const cur = list[active];
@@ -79,7 +137,7 @@ export default function SolutionsModal({ t, problem, lang, solutions, onChange, 
                   <button className="btn sm danger" onClick={() => remove(active)}>{t.solDelete}</button>
                 </div>
                 <textarea className="sol__code" value={cur.code} placeholder={t.solCodePh}
-                  spellCheck={false} onKeyDown={onTab}
+                  spellCheck={false} autoCapitalize="off" autoCorrect="off" onKeyDown={onCode}
                   onChange={(e) => patch(active, { code: e.target.value })} />
                 <div className="sol__foot">
                   {cur.updatedAt && <span>{t.solUpdated}: {new Date(cur.updatedAt).toLocaleString(lang === "ko" ? "ko-KR" : "en-US")}</span>}

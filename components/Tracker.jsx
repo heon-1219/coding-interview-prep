@@ -98,18 +98,35 @@ export default function Tracker({ user }) {
     return Math.floor((now - s) / 86400000) + 1;
   }, [state]);
 
+  // ── adaptive pacing: the plan holds on the first dated day that isn't fully
+  // checked off, and every later date shifts by however far behind you are.
+  // Derived purely from `items`, so it re-computes live on every checkbox tap.
+  const effectiveDay = useMemo(() => {
+    if (!state) return 1;
+    const dated = DAYS.filter((d) => d.dated).sort((a, b) => a.n - b.n);
+    for (const d of dated) if (!d.items.every((i) => state.items[i.id]?.done)) return d.n;
+    return LAST_DAY + 1;
+  }, [state]);
+  const planDone = effectiveDay > LAST_DAY;
+  const lag = todayIndex >= 1 && !planDone ? todayIndex - effectiveDay : 0; // >0 behind, <0 ahead
+  const shift = Math.max(0, lag);
+
   const dayDate = useCallback((n) => {
     const [y, m, d] = state.start.split("-").map(Number);
-    const base = new Date(y, m - 1, d); base.setDate(base.getDate() + (n - 1));
+    const base = new Date(y, m - 1, d);
+    base.setDate(base.getDate() + (n - 1) + (n >= effectiveDay ? shift : 0));
     const wd = WEEKDAYS[lang][base.getDay()];
     return lang === "ko"
       ? `${base.getMonth() + 1}월 ${base.getDate()}일 (${wd})`
       : `${wd}, ${base.toLocaleString("en-US", { month: "short" })} ${base.getDate()}`;
-  }, [state, lang]);
+  }, [state, lang, effectiveDay, shift]);
 
-  // ── Today + spaced review (1 / 3 / 5 days ago) ──
+  const paceCls = planDone ? "done" : lag > 0 ? "behind" : lag < 0 ? "ahead" : "ontrack";
+  const paceText = !state ? "" : planDone ? t.paceDone : lag > 0 ? t.paceBehind(lag) : lag < 0 ? t.paceAhead(-lag) : t.paceOnTrack;
+
+  // ── Today + spaced review (1 / 3 / 5 days ago), following the lagged schedule ──
   const datedDay = useCallback((n) => DAYS.find((d) => d.dated && d.n === n), []);
-  const todayPos = Math.max(1, Math.min(LAST_DAY, todayIndex));
+  const todayPos = Math.max(1, Math.min(LAST_DAY, effectiveDay));
   const todayDay = datedDay(todayPos);
   const reviewGroups = [1, 3, 5]
     .map((off) => ({ off, n: todayPos - off }))
@@ -136,7 +153,7 @@ export default function Tracker({ user }) {
   };
 
   const scrollToday = () => {
-    const n = Math.max(1, Math.min(LAST_DAY, todayIndex));
+    const n = todayIndex < 1 ? 1 : todayPos;
     document.getElementById("day-" + n)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setCollapsed((c) => ({ ...c, [n]: false }));
   };
@@ -193,8 +210,11 @@ export default function Tracker({ user }) {
             <span className="today__sub">
               {todayIndex < 1
                 ? t.todayNotStarted(dayDate(1))
-                : <>{t.dayLabel} {todayPos}{todayDay ? <> · {todayDay.topic[lang]}</> : null}</>}
+                : planDone
+                  ? t.paceDone
+                  : <>{t.dayLabel} {todayPos}{todayDay ? <> · {todayDay.topic[lang]}</> : null}</>}
             </span>
+            {todayIndex >= 1 && <span className={"pacepill " + paceCls}>{paceText}</span>}
             <span className="caret" style={{ transform: showToday ? "" : "rotate(-90deg)" }}>▾</span>
           </button>
           {showToday && (
@@ -203,9 +223,13 @@ export default function Tracker({ user }) {
                 <p className="today__empty">{t.todayNotStarted(dayDate(1))}</p>
               ) : (
                 <>
+                  {lag > 0 && <p className="pace__hint">{t.behindHint(lag)}</p>}
+                  {lag < 0 && !planDone && <p className="pace__hint ahead">{t.aheadHint}</p>}
                   <div className="today__study">
                     <h3 className="today__h">{t.studyToday}</h3>
-                    {todayDay?.items.map(renderItem)}
+                    {planDone
+                      ? <p className="today__empty">{t.todayAllReviewed}</p>
+                      : todayDay?.items.map(renderItem)}
                   </div>
                   <div className="today__review">
                     <h3 className="today__h">{t.reviewToday}</h3>
@@ -253,6 +277,12 @@ export default function Tracker({ user }) {
               <div className="bigbar__track"><div className="bigbar__fill" style={{ width: pct + "%" }} /></div>
               <div className="bigbar__lbl"><span>{t.pctDone(pct)}</span><span>{t.itemsCount(doneCount, TOTAL)}</span></div>
             </div>
+            {todayIndex >= 1 && (
+              <div className="pace">
+                <span className={"pacepill " + paceCls}>{paceText}</span>
+                {!planDone && <span className="pace__est">{t.estFinish(dayDate(LAST_DAY))}</span>}
+              </div>
+            )}
           </div>
         </section>
 
@@ -273,7 +303,7 @@ export default function Tracker({ user }) {
                 {header}
                 <DayCard
                   d={d} t={t} lang={lang} state={state}
-                  isToday={d.dated && todayIndex === d.n}
+                  isToday={d.dated && todayIndex >= 1 && !planDone && d.n === todayPos}
                   collapsed={collapsed[d.key] ?? dc}
                   onCollapse={() => setCollapsed((c) => ({ ...c, [d.key]: !(c[d.key] ?? dc) }))}
                   dayDate={dayDate}
