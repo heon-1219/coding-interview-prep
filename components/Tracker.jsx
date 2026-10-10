@@ -1,8 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { DAYS, SECTIONS, ITEMS, ITEM_CORE, TOTAL, LAST_DAY, itemTitle } from "@/lib/plan";
+import { DAYS, SECTIONS, ITEMS, ITEM_CORE, TOTAL, LAST_DAY } from "@/lib/plan";
+import { GS_DAYS, GS_TOPICS, GS_BANK, GS_ITEMS, GS_PLAN_IDS, gsDefaultOA, gsFocusDay } from "@/lib/sprint";
 import { STRINGS, WEEKDAYS } from "@/lib/i18n";
+import ItemRow from "@/components/ItemRow";
+import SprintTrack, { GS_TABS } from "@/components/SprintTrack";
 import SolutionsModal from "@/components/SolutionsModal";
 import SettingsModal from "@/components/SettingsModal";
 import SummaryModal from "@/components/SummaryModal";
@@ -11,6 +14,9 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 // Fresh accounts start completely empty — nothing pre-checked.
 const emptyState = () => ({ start: isoToday(), lang: "en", items: {}, dayNotes: {}, solutions: {}, summary: "", summaryDate: "" });
 const FIRST_COMPANY_KEY = DAYS.find((d) => d.company)?.key;
+// Tracks: the NeetCode 250 plan, or the optional Google OA sprint. `state.track`
+// holds the user's default (missing = NeetCode); the switcher flips the view.
+const NC = "nc250", GS = "gsprint";
 
 export default function Tracker({ user }) {
   const [state, setState] = useState(null);
@@ -25,11 +31,15 @@ export default function Tracker({ user }) {
   const [showToday, setShowToday] = useState(true);
   const [theme, setTheme] = useState("light");
   const [preFilter, setPreFilter] = useState("all"); // "Already done" difficulty filter
+  const [view, setView] = useState(null); // track on screen; opens on the user's default
+  const [gsTab, setGsTabRaw] = useState("plan"); // sprint tab, remembered per device
 
   // pick up the theme the pre-paint script already applied
   useEffect(() => {
     try { setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"); } catch {}
+    try { const v = localStorage.getItem("ctt-gs-tab"); if (GS_TABS.includes(v)) setGsTabRaw(v); } catch {}
   }, []);
+  const setGsTab = (v) => { setGsTabRaw(v); try { localStorage.setItem("ctt-gs-tab", v); } catch {} };
   const toggleTheme = () => {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
@@ -60,6 +70,7 @@ export default function Tracker({ user }) {
       if (!s.lang) s.lang = "en";
       if (!s.start) s.start = isoToday();
       setState(s);
+      setView((v) => v || (s.track === GS ? GS : NC));
     } catch (e) {
       setLoadErr(e.message || "load failed");
     }
@@ -89,6 +100,13 @@ export default function Tracker({ user }) {
   const doneCount = useMemo(() => state ? Object.keys(state.items).filter((id) => ITEMS[id] && ITEM_CORE[id] && state.items[id].done).length : 0, [state]);
   const hardIds = useMemo(() => state ? Object.keys(state.items).filter((id) => ITEMS[id] && state.items[id].diff === "h") : [], [state]);
   const pct = TOTAL ? Math.round((doneCount / TOTAL) * 100) : 0;
+
+  // ── tracks ──
+  const isGs = view === GS;
+  const defTrack = state?.track === GS ? GS : NC;
+  const gsDone = useMemo(() => state ? GS_PLAN_IDS.filter((id) => state.items[id]?.done).length : 0, [state]);
+  const gsHard = useMemo(() => state ? GS_BANK.filter((p) => state.items[p.id]?.diff === "h").length : 0, [state]);
+  const gsPct = Math.round((gsDone / GS_PLAN_IDS.length) * 100);
 
   const todayIndex = useMemo(() => {
     if (!state) return 1;
@@ -146,25 +164,40 @@ export default function Tracker({ user }) {
   };
   const setSolutions = (pid, list) => update((s) => { s.solutions[pid] = list; return s; });
   const setSummary = (text) => update((s) => { s.summary = text; s.summaryDate = new Date().toISOString(); return s; });
+  const setDefaultTrack = (k) => update((s) => { s.track = k; return s; });
+  const setOA = (v) => update((s) => { s.gsOA = v || gsDefaultOA(); return s; });
+  // First visit to the sprint pins its OA date (default: Day 1 = today) so the schedule stays put.
+  useEffect(() => {
+    if (view === GS && state && !state.gsOA) update((s) => { s.gsOA = gsDefaultOA(); return s; });
+  }, [view, state, update]);
   const resetAll = async () => {
     if (!confirm(t.resetConfirm)) return;
     const fresh = emptyState(); fresh.lang = lang; fresh.start = state.start;
+    fresh.track = state.track; fresh.gsOA = state.gsOA; // settings, not progress
     setState(fresh); stateRef.current = fresh; await saveNow();
   };
 
   const scrollToday = () => {
+    if (isGs) {
+      const key = gsFocusDay(state.gsOA || gsDefaultOA()).key;
+      setGsTab("plan");
+      setCollapsed((c) => ({ ...c, [key]: false }));
+      // the Plan tab may only mount on this render — scroll once it's there
+      setTimeout(() => document.getElementById("day-" + key)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      return;
+    }
     const n = todayIndex < 1 ? 1 : todayPos;
     document.getElementById("day-" + n)?.scrollIntoView({ behavior: "smooth", block: "start" });
     setCollapsed((c) => ({ ...c, [n]: false }));
   };
   const toggleAll = () => {
     const next = !allCollapsed; setAllCollapsed(next);
-    const c = {}; DAYS.forEach((d) => { c[d.key] = next; }); setCollapsed(c);
+    const c = {}; [...DAYS, ...GS_DAYS, ...GS_TOPICS].forEach((d) => { c[d.key] = next; }); setCollapsed(c);
   };
 
-  // Reusable item row (shared by the Today panel).
-  const renderItem = (i) => (
-    <ItemRow key={i.id} i={i} t={t} lang={lang} st={state.items[i.id]}
+  // Reusable item row (Today panels + the sprint track); `meta` = extra badges under the title.
+  const renderItem = (i, meta) => (
+    <ItemRow key={i.id} i={i} t={t} lang={lang} st={state.items[i.id]} meta={meta}
       solCount={(state.solutions[i.id] || []).length}
       noteOpen={!!openNotes[i.id]}
       onToggleNote={() => setOpenNotes((o) => ({ ...o, [i.id]: !o[i.id] }))}
@@ -191,8 +224,8 @@ export default function Tracker({ user }) {
       <div className="topbar">
         <div className="topbar__in">
           <span className="brand"><b>{t.appName}</b></span>
-          <div className="topbar__bar"><div className="topbar__fill" style={{ width: pct + "%" }} /></div>
-          <span className="topbar__stat">{t.statDone} <b>{doneCount}</b>/{TOTAL} · {t.statReview} <b>{hardIds.length}</b></span>
+          <div className="topbar__bar"><div className="topbar__fill" style={{ width: (isGs ? gsPct : pct) + "%" }} /></div>
+          <span className="topbar__stat">{t.statDone} <b>{isGs ? gsDone : doneCount}</b>/{isGs ? GS_PLAN_IDS.length : TOTAL} · {t.statReview} <b>{isGs ? gsHard : hardIds.length}</b></span>
           <div className="topbar__actions">
             <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
             <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
@@ -204,124 +237,154 @@ export default function Tracker({ user }) {
       </div>
 
       <div className="wrap">
-        <section className="today">
-          <button className="today__head" onClick={() => setShowToday((v) => !v)} aria-expanded={showToday}>
-            <span className="today__badge">{t.todayTitle}</span>
-            <span className="today__sub">
-              {todayIndex < 1
-                ? t.todayNotStarted(dayDate(1))
-                : planDone
-                  ? t.paceDone
-                  : <>{t.dayLabel} {todayPos}{todayDay ? <> · {todayDay.topic[lang]}</> : null}</>}
-            </span>
-            {todayIndex >= 1 && <span className={"pacepill " + paceCls}>{paceText}</span>}
-            <span className="caret" style={{ transform: showToday ? "" : "rotate(-90deg)" }}>▾</span>
+        <div className="trackbar">
+          <div className="tracksw" role="tablist" aria-label={t.trackAria}>
+            {[[NC, t.trackNc, pct], [GS, t.trackGs, gsPct]].map(([k, name, p]) => (
+              <button key={k} role="tab" aria-selected={view === k} className={"tracksw__btn" + (view === k ? " on" : "")} onClick={() => setView(k)}>
+                <span className="tracksw__name">{name}</span>
+                <span className="tracksw__sub">{t.trackSub(p, defTrack === k)}</span>
+              </button>
+            ))}
+          </div>
+          {/* raised = tap to make the track on screen the default; sunk = it already is */}
+          <button className={"deftog" + (view === defTrack ? " on" : "")} aria-pressed={view === defTrack} disabled={view === defTrack}
+            onClick={() => setDefaultTrack(view)} title={view === defTrack ? t.trackIsDefault : t.trackMakeDefault}
+            aria-label={view === defTrack ? t.trackIsDefault : t.trackMakeDefault}>
+            <span className="deftog__star" aria-hidden="true">{view === defTrack ? "★" : "☆"}</span>
+            <span className="deftog__lbl" aria-hidden="true">{t.trackDefault}</span>
           </button>
-          {showToday && (
-            <div className="today__body">
-              {todayIndex < 1 ? (
-                <p className="today__empty">{t.todayNotStarted(dayDate(1))}</p>
-              ) : (
-                <>
-                  {lag > 0 && <p className="pace__hint">{t.behindHint(lag)}</p>}
-                  {lag < 0 && !planDone && <p className="pace__hint ahead">{t.aheadHint}</p>}
-                  <div className="today__study">
-                    <h3 className="today__h">{t.studyToday}</h3>
-                    {planDone
-                      ? <p className="today__empty">{t.todayAllReviewed}</p>
-                      : todayDay?.items.map(renderItem)}
-                  </div>
-                  <div className="today__review">
-                    <h3 className="today__h">{t.reviewToday}</h3>
-                    <p className="today__hint">{t.reviewSpacedHint}</p>
-                    {reviewGroups.length === 0 ? (
-                      <p className="today__empty">{todayPos >= LAST_DAY ? t.todayAllReviewed : t.todayNothingReview}</p>
-                    ) : (
-                      reviewGroups.map((g) => (
-                        <div className="today__grp" key={g.off}>
-                          <div className="today__grplbl">{t.agoLabel(g.off)} · {t.dayLabel} {g.n} · {g.day.topic[lang]}</div>
-                          {g.day.items.filter((i) => i.type === "p").map(renderItem)}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </>
+        </div>
+
+        {isGs ? (
+          <SprintTrack
+            t={t} lang={lang} state={state}
+            tab={gsTab} setTab={setGsTab}
+            collapsed={collapsed} setCollapsed={setCollapsed}
+            showToday={showToday} setShowToday={setShowToday}
+            renderItem={renderItem} onSetOA={setOA} setDayNote={setDayNote}
+          />
+        ) : (
+          <>
+            <section className="today">
+              <button className="today__head" onClick={() => setShowToday((v) => !v)} aria-expanded={showToday}>
+                <span className="today__badge">{t.todayTitle}</span>
+                <span className="today__sub">
+                  {todayIndex < 1
+                    ? t.todayNotStarted(dayDate(1))
+                    : planDone
+                      ? t.paceDone
+                      : <>{t.dayLabel} {todayPos}{todayDay ? <> · {todayDay.topic[lang]}</> : null}</>}
+                </span>
+                {todayIndex >= 1 && <span className={"pacepill " + paceCls}>{paceText}</span>}
+                <span className="caret" style={{ transform: showToday ? "" : "rotate(-90deg)" }}>▾</span>
+              </button>
+              {showToday && (
+                <div className="today__body">
+                  {todayIndex < 1 ? (
+                    <p className="today__empty">{t.todayNotStarted(dayDate(1))}</p>
+                  ) : (
+                    <>
+                      {lag > 0 && <p className="pace__hint">{t.behindHint(lag)}</p>}
+                      {lag < 0 && !planDone && <p className="pace__hint ahead">{t.aheadHint}</p>}
+                      <div className="today__study">
+                        <h3 className="today__h">{t.studyToday}</h3>
+                        {planDone
+                          ? <p className="today__empty">{t.todayAllReviewed}</p>
+                          : todayDay?.items.map((i) => renderItem(i))}
+                      </div>
+                      <div className="today__review">
+                        <h3 className="today__h">{t.reviewToday}</h3>
+                        <p className="today__hint">{t.reviewSpacedHint}</p>
+                        {reviewGroups.length === 0 ? (
+                          <p className="today__empty">{todayPos >= LAST_DAY ? t.todayAllReviewed : t.todayNothingReview}</p>
+                        ) : (
+                          reviewGroups.map((g) => (
+                            <div className="today__grp" key={g.off}>
+                              <div className="today__grplbl">{t.agoLabel(g.off)} · {t.dayLabel} {g.n} · {g.day.topic[lang]}</div>
+                              {g.day.items.filter((i) => i.type === "p").map((i) => renderItem(i))}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </section>
+            </section>
 
-        <section className="hero">
-          <p className="hero__k">{t.tagline}</p>
-          <h1>{t.heroTitle}</h1>
-          <p>{t.heroBody}</p>
-          <div className="chips">
-            <span className="chip">{t.chip1}</span>
-            <span className="chip">{t.chip2}</span>
-            <span className="chip">{t.chip3}</span>
-          </div>
-          <div className="panel">
-            <div className="field">
-              <label htmlFor="start">{t.startDate}</label>
-              <input type="date" id="start" value={state.start} onChange={(e) => setStart(e.target.value)} />
-            </div>
-            <div className="legend">
-              <div className="legend__row lbl">{t.feltLabel}</div>
-              <div className="legend__row">
-                <span><i className="ld e" /> {t.feltEasy}</span>
-                <span><i className="ld o" /> {t.feltOk}</span>
-                <span><i className="ld h" /> {t.feltHard}</span>
+            <section className="hero">
+              <p className="hero__k">{t.tagline}</p>
+              <h1>{t.heroTitle}</h1>
+              <p>{t.heroBody}</p>
+              <div className="chips">
+                <span className="chip">{t.chip1}</span>
+                <span className="chip">{t.chip2}</span>
+                <span className="chip">{t.chip3}</span>
               </div>
-            </div>
-            <div className="bigbar">
-              <div className="bigbar__track"><div className="bigbar__fill" style={{ width: pct + "%" }} /></div>
-              <div className="bigbar__lbl"><span>{t.pctDone(pct)}</span><span>{t.itemsCount(doneCount, TOTAL)}</span></div>
-            </div>
-            {todayIndex >= 1 && (
-              <div className="pace">
-                <span className={"pacepill " + paceCls}>{paceText}</span>
-                {!planDone && <span className="pace__est">{t.estFinish(dayDate(LAST_DAY))}</span>}
+              <div className="panel">
+                <div className="field">
+                  <label htmlFor="start">{t.startDate}</label>
+                  <input type="date" id="start" value={state.start} onChange={(e) => setStart(e.target.value)} />
+                </div>
+                <div className="legend">
+                  <div className="legend__row lbl">{t.feltLabel}</div>
+                  <div className="legend__row">
+                    <span><i className="ld e" /> {t.feltEasy}</span>
+                    <span><i className="ld o" /> {t.feltOk}</span>
+                    <span><i className="ld h" /> {t.feltHard}</span>
+                  </div>
+                </div>
+                <div className="bigbar">
+                  <div className="bigbar__track"><div className="bigbar__fill" style={{ width: pct + "%" }} /></div>
+                  <div className="bigbar__lbl"><span>{t.pctDone(pct)}</span><span>{t.itemsCount(doneCount, TOTAL)}</span></div>
+                </div>
+                {todayIndex >= 1 && (
+                  <div className="pace">
+                    <span className={"pacepill " + paceCls}>{paceText}</span>
+                    {!planDone && <span className="pace__est">{t.estFinish(dayDate(LAST_DAY))}</span>}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </section>
+            </section>
 
-        <main>
-          {DAYS.map((d) => {
-            const sec = SECTIONS[d.sec];
-            const header = d.sec !== lastSec ? (lastSec = d.sec, (
-              <div className={"phase" + (sec.company ? " company" : "")} key={"sec-" + d.sec}>
-                <span className="phase__n">{typeof sec.n === "string" ? sec.n : sec.n[lang]}</span>
-                <h2>{sec.t[lang]}</h2>
-                <span className="phase__span">{sec.span[lang]}</span>
-              </div>
-            )) : null;
-            const dc = d.pre || !!d.company; // optional sections start collapsed
-            return (
-              <FragmentWithKey key={d.key}>
-                {d.key === FIRST_COMPANY_KEY && <div className="companyintro">{t.companyIntro}</div>}
-                {header}
-                <DayCard
-                  d={d} t={t} lang={lang} state={state}
-                  isToday={d.dated && todayIndex >= 1 && !planDone && d.n === todayPos}
-                  collapsed={collapsed[d.key] ?? dc}
-                  onCollapse={() => setCollapsed((c) => ({ ...c, [d.key]: !(c[d.key] ?? dc) }))}
-                  dayDate={dayDate}
-                  openNotes={openNotes} setOpenNotes={setOpenNotes}
-                  toggleDone={toggleDone} setDiff={setDiff} setNote={setNote} setDayNote={setDayNote}
-                  onOpenSolutions={(pid) => setSolFor(pid)}
-                  preFilter={preFilter} setPreFilter={setPreFilter}
-                />
-              </FragmentWithKey>
-            );
-          })}
-        </main>
+            <main>
+              {DAYS.map((d) => {
+                const sec = SECTIONS[d.sec];
+                const header = d.sec !== lastSec ? (lastSec = d.sec, (
+                  <div className={"phase" + (sec.company ? " company" : "")} key={"sec-" + d.sec}>
+                    <span className="phase__n">{typeof sec.n === "string" ? sec.n : sec.n[lang]}</span>
+                    <h2>{sec.t[lang]}</h2>
+                    <span className="phase__span">{sec.span[lang]}</span>
+                  </div>
+                )) : null;
+                const dc = d.pre || !!d.company; // optional sections start collapsed
+                return (
+                  <FragmentWithKey key={d.key}>
+                    {d.key === FIRST_COMPANY_KEY && <div className="companyintro">{t.companyIntro}</div>}
+                    {header}
+                    <DayCard
+                      d={d} t={t} lang={lang} state={state}
+                      isToday={d.dated && todayIndex >= 1 && !planDone && d.n === todayPos}
+                      collapsed={collapsed[d.key] ?? dc}
+                      onCollapse={() => setCollapsed((c) => ({ ...c, [d.key]: !(c[d.key] ?? dc) }))}
+                      dayDate={dayDate}
+                      openNotes={openNotes} setOpenNotes={setOpenNotes}
+                      toggleDone={toggleDone} setDiff={setDiff} setNote={setNote} setDayNote={setDayNote}
+                      onOpenSolutions={(pid) => setSolFor(pid)}
+                      preFilter={preFilter} setPreFilter={setPreFilter}
+                    />
+                  </FragmentWithKey>
+                );
+              })}
+            </main>
+          </>
+        )}
 
         <footer>
           <b>{t.footTips}</b><br />
           · {t.foot1}<br />
           · {t.foot2}<br />
-          · {t.foot3}<br />
+          {!isGs && <>· {t.foot3}<br /></>}
           · {t.foot4}
           <div className="reset"><button onClick={resetAll}>{t.resetTitle}</button></div>
           <div className="credit">{t.builtBy} <a href="https://davidseheonchang.xyz" target="_blank" rel="noopener noreferrer">David Seheon Chang <span className="ext">↗</span></a></div>
@@ -343,7 +406,7 @@ export default function Tracker({ user }) {
 
       {solFor && (
         <SolutionsModal
-          t={t} problem={ITEMS[solFor]} lang={lang}
+          t={t} problem={ITEMS[solFor] || GS_ITEMS[solFor]} lang={lang}
           solutions={state.solutions[solFor] || []}
           onChange={(list) => setSolutions(solFor, list)}
           onClose={() => setSolFor(null)}
@@ -367,16 +430,6 @@ function FragmentWithKey({ children }) { return <>{children}</>; }
 
 function structuredCloneSafe(o) {
   try { return structuredClone(o); } catch { return JSON.parse(JSON.stringify(o)); }
-}
-
-function DiffButtons({ st, onSet }) {
-  return (
-    <div className="diff" role="group" aria-label="felt difficulty">
-      {["e", "o", "h"].map((d) => (
-        <button key={d} className={`dbtn ${d}${st?.diff === d ? " on" : ""}`} onClick={() => onSet(d)} aria-label={d}><i /></button>
-      ))}
-    </div>
-  );
 }
 
 function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, openNotes, setOpenNotes, toggleDone, setDiff, setNote, setDayNote, onOpenSolutions, preFilter, setPreFilter }) {
@@ -433,40 +486,6 @@ function DayCard({ d, t, lang, state, isToday, collapsed, onCollapse, dayDate, o
                 onChange={(e) => setDayNote(d.key, e.target.value)} rows={2} />
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNote, onDone, onDiff, onNote, onSolutions }) {
-  const isProb = i.type === "p";
-  // "implement …" tasks are code you write, so they get difficulty + solutions too
-  const codeTask = i.type === "t" && /implement/i.test(i.t?.en || "");
-  const showControls = isProb || codeTask;
-  const lv = isProb ? i.lv : (codeTask ? "C" : "T");
-  return (
-    <div className={"item" + (st?.done ? " checked" : "")}>
-      <input type="checkbox" className="cbox" checked={!!st?.done} onChange={onDone} aria-label="done" />
-      <span className={"lv " + lv}>{isProb ? i.lv : (codeTask ? "{}" : "✓")}</span>
-      <div className="item__main">
-        {i.url
-          ? <a className="item__t" href={i.url} target="_blank" rel="noopener noreferrer">{itemTitle(i, lang)}<span className="ext">↗</span></a>
-          : <span className="item__t">{itemTitle(i, lang)}</span>}
-        {i.nc && <span className="ncbadge">{t.ncFree}</span>}
-      </div>
-      <div className="item__right">
-        {showControls && (
-          <button className={"solbtn" + (solCount ? " has" : "")} onClick={onSolutions} title={t.solutionsBtn}>
-            {"</>"}{solCount ? <span className="solcnt">{solCount}</span> : null}
-          </button>
-        )}
-        {showControls && <DiffButtons st={st} onSet={onDiff} />}
-        <button className={"notebtn" + (st?.note?.trim() ? " has" : "")} onClick={onToggleNote} title={t.noteBtn}>✎</button>
-      </div>
-      {noteOpen && (
-        <div className="notewrap open">
-          <textarea value={st?.note || ""} placeholder={t.notePh} rows={2} onChange={(e) => onNote(e.target.value)} />
         </div>
       )}
     </div>

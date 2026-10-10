@@ -8,7 +8,7 @@
   --bg:#DAE0EB; --clay:#E9EDF5; --clay-sink:#DEE3EC;
   --ink:#282D38; --ink-soft:#545C70; --ink-faint:#79839A;
   --accent:#5560D8; --accent-strong:#434DC2; --accent-soft:#D6D9F6;
-  --easy:#1E9B69; --ok:#B67F18; --hard:#D9483F;
+  --easy:#1E9B69; --ok:#B67F18; --hard:#D9483F; --prem:#7446BF;
   --easy-soft:#D7EAE0; --ok-soft:#ECE3CD; --hard-soft:#F0DBD7;
   --line:rgba(150,163,190,.42); --glow:rgba(85,96,216,.5); --hover:rgba(255,255,255,.5);
   --surface:var(--clay); --surface-2:var(--clay-sink);
@@ -29,7 +29,7 @@
     --bg:#1E222B; --clay:#282D38; --clay-sink:#22262F;
     --ink:#E9ECF3; --ink-soft:#AAB2C4; --ink-faint:#858EA3;
     --accent:#828AF2; --accent-strong:#9AA1F6; --accent-soft:#39406A;
-    --easy:#42B98D; --ok:#D2A445; --hard:#EC726B;
+    --easy:#42B98D; --ok:#D2A445; --hard:#EC726B; --prem:#B89CFF;
     --easy-soft:#1E332B; --ok-soft:#33301E; --hard-soft:#3A2523;
     --line:rgba(125,137,163,.2); --glow:rgba(130,138,242,.55); --hover:rgba(255,255,255,.045);
     --sh-out:6px 6px 16px rgba(9,11,15,.7), -6px -6px 14px rgba(58,65,82,.5);
@@ -45,7 +45,7 @@
   --bg:#1E222B; --clay:#282D38; --clay-sink:#22262F;
   --ink:#E9ECF3; --ink-soft:#AAB2C4; --ink-faint:#858EA3;
   --accent:#828AF2; --accent-strong:#9AA1F6; --accent-soft:#39406A;
-  --easy:#42B98D; --ok:#D2A445; --hard:#EC726B;
+  --easy:#42B98D; --ok:#D2A445; --hard:#EC726B; --prem:#B89CFF;
   --easy-soft:#1E332B; --ok-soft:#33301E; --hard-soft:#3A2523;
   --line:rgba(125,137,163,.2); --glow:rgba(130,138,242,.55); --hover:rgba(255,255,255,.045);
   --sh-out:6px 6px 16px rgba(9,11,15,.7), -6px -6px 14px rgba(58,65,82,.5);
@@ -404,3 +404,122 @@ footer .reset button:active{box-shadow:var(--sh-in-sm)}
 .pace__hint{margin:2px 0 12px;padding:10px 14px;border-radius:var(--radius-sm);line-height:1.55;
   font-size:13px;font-weight:600;color:var(--hard);background:var(--hard-soft);box-shadow:var(--sh-in-sm)}
 .pace__hint.ahead{color:var(--easy);background:var(--easy-soft)}
+
+/* ── Tracks: an inset trough, the track on screen rides raised in it ──── */
+.trackbar{margin-top:20px;display:flex;align-items:stretch;gap:12px}
+.tracksw{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:6px;
+  border-radius:16px;background:var(--clay);box-shadow:var(--sh-in-sm)}
+.tracksw__btn{min-width:0;border:0;background:transparent;border-radius:11px;padding:9px 13px;text-align:left;
+  display:flex;flex-direction:column;gap:2px;color:var(--ink-soft);transition:box-shadow .15s,color .15s,background .15s}
+.tracksw__btn:hover{color:var(--accent)}
+.tracksw__btn.on{background:var(--clay);box-shadow:var(--sh-out-sm);color:var(--accent)}
+.tracksw__name{font-size:13.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tracksw__sub{font-family:var(--mono);font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* default-track key: raised = make default, sunk = is default */
+.deftog{flex:none;min-width:64px;border:0;border-radius:14px;background:var(--clay);box-shadow:var(--sh-out-sm);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px 10px;
+  color:var(--ink-faint);transition:box-shadow .12s,color .12s}
+.deftog__star{font-size:17px;line-height:1}
+.deftog__lbl{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.deftog:hover{color:var(--accent)}
+.deftog:active{box-shadow:var(--sh-in-sm)}
+.deftog.on{cursor:default;box-shadow:var(--sh-in-sm);color:var(--accent)}
+.deftog.on .deftog__star{color:var(--ok)}
+
+/* ── Google OA sprint ─────────────────────────────────────────────────── */
+.gsdates{display:flex;flex-direction:column;gap:4px;padding-bottom:3px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.gsmeters{flex:1 1 100%;display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.gsmeter{display:grid;grid-template-columns:44px minmax(0,1fr) auto;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.gsmeter__lbl{font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.gsmeter__track{height:12px;border-radius:99px;background:var(--clay);box-shadow:var(--sh-in);overflow:hidden}
+.gsmeter__fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-strong));
+  box-shadow:0 0 10px var(--glow);transition:width .5s ease}
+.gsmeter__n b{color:var(--accent)}
+.gstabs{display:flex;gap:8px;flex-wrap:wrap;margin:30px 4px 16px}
+.gstab{border:0;background:var(--clay);box-shadow:var(--sh-out-sm);color:var(--ink-soft);font-size:13px;font-weight:700;
+  padding:9px 16px;border-radius:99px;min-height:38px;transition:box-shadow .12s,color .12s,background .12s}
+.gstab:hover{color:var(--accent)}
+.gstab:active{box-shadow:var(--sh-in-sm)}
+.gstab.on{background:var(--accent);color:#fff;box-shadow:var(--sh-out-sm),0 0 10px var(--glow)}
+.gsnote{margin:0 6px 16px;font-size:13px;color:var(--ink-soft);line-height:1.6;max-width:70ch}
+.gsday__lbl{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:4px}
+/* timed drill — carved into the day card */
+.drill{margin:10px 4px 6px;padding:4px 4px 8px;border-radius:var(--radius-sm);background:var(--clay);box-shadow:var(--sh-in-sm)}
+.drill__head{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;padding:10px 10px 2px}
+.drill__name{font-size:13px;font-weight:700}
+.drill__timer{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);
+  border-radius:7px;padding:3px 8px;white-space:nowrap}
+.drill__note{margin:2px 10px 4px;font-size:12.5px;color:var(--ink-soft)}
+.gsmiss{padding:0 8px}
+/* problem badges: #number · Reported · Premium · Google-tag heat · day */
+.gsmeta{display:flex;flex-wrap:wrap;align-items:center;gap:5px 7px;margin-top:5px}
+.gsnum{font-family:var(--mono);font-size:11px;color:var(--ink-faint);font-variant-numeric:tabular-nums}
+.gpill{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;line-height:1.2;
+  border:1px solid currentColor;border-radius:5px;padding:2px 5px;white-space:nowrap}
+.gpill.rep{color:var(--accent)}
+.gpill.prem{color:var(--prem)}
+.gpill.dayt{color:var(--ink-faint);border-style:dashed}
+.heat{display:inline-flex;gap:2px}
+.heat i{width:7px;height:7px;border-radius:2px;background:var(--clay-sink);box-shadow:inset 0 0 0 1px var(--line)}
+.heat i.on{background:var(--accent);box-shadow:none}
+/* Topics filters */
+.gsfilters{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px;margin-bottom:12px;
+  border-radius:var(--radius);background:var(--clay);box-shadow:var(--sh-out)}
+.gsfilters__grp{display:flex;flex-wrap:wrap;gap:7px}
+.gsfilters .pfbtn{padding:7px 12px;font-size:11.5px}
+.gssearch{flex:1 1 200px;min-width:0;font-size:13.5px;padding:10px 13px;border:0;border-radius:var(--radius-sm);
+  background:var(--clay);box-shadow:var(--sh-in-sm);color:var(--ink)}
+.gssearch::placeholder{color:var(--ink-faint)}
+.gslegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0 6px 16px;font-size:12px;color:var(--ink-soft)}
+.gslegend>span{display:inline-flex;align-items:center;gap:7px}
+.gsempty{padding:18px;border-radius:var(--radius);background:var(--clay);box-shadow:var(--sh-in-sm);font-size:13px;color:var(--ink-faint)}
+/* Reported */
+.reports{border-radius:var(--radius);background:var(--clay);box-shadow:var(--sh-out);padding:4px 0}
+.report{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:8px 20px;padding:15px 20px;border-top:1px solid var(--line)}
+.report:first-child{border-top:0}
+.report__what{font-size:14px;font-weight:700;letter-spacing:-.01em}
+.report__meta{margin-top:3px;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint)}
+.report__meta a{color:var(--ink-soft);text-decoration:none}
+.report__meta a:hover{color:var(--accent)}
+.report__chips{display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start}
+.pchip{display:inline-flex;align-items:baseline;gap:6px;padding:6px 10px;border-radius:10px;background:var(--clay);
+  box-shadow:var(--sh-out-sm);font-size:13px;font-weight:600;color:var(--ink);text-decoration:none;transition:box-shadow .12s,color .12s}
+.pchip:hover{color:var(--accent)}
+.pchip__n{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.pchip .gpill{align-self:center}
+.pchip.done{box-shadow:var(--sh-in-sm);color:var(--ink-faint)}
+.pchip.done::after{content:"✓";color:var(--easy);font-weight:800}
+/* Format & tips */
+.fmt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.fmtblk{display:flex;flex-direction:column;gap:10px;padding:18px 20px;border-radius:var(--radius);background:var(--clay);box-shadow:var(--sh-out)}
+.fmtblk.wide{grid-column:1/-1}
+.fmtblk h3{margin:0;font-size:15px;letter-spacing:-.01em}
+.fmtblk ul,.fmtblk ol{margin:0;padding-left:1.25em;display:flex;flex-direction:column;gap:7px;font-size:13.5px;color:var(--ink-soft)}
+.fmtblk li::marker{color:var(--accent);font-weight:700}
+.fmtblk p{margin:0;font-size:13.5px;color:var(--ink-soft);line-height:1.65}
+.fmtblk .srcs{display:block;columns:2;column-gap:28px}
+.srcs li{break-inside:avoid;margin-bottom:7px}
+.srcs a{color:var(--ink-soft);text-decoration:none}
+.srcs a:hover{color:var(--accent)}
+.report__meta .ext,.srcs .ext{font-size:11px;color:var(--ink-faint)}
+@media (max-width:600px){
+  .trackbar{margin-top:14px;gap:10px}
+  .tracksw__btn{padding:8px 10px}
+  .deftog{min-width:58px}
+  .gstabs{margin-top:24px}
+  .gsmeter{grid-template-columns:40px minmax(0,1fr) auto;gap:10px}
+  .report{grid-template-columns:minmax(0,1fr);padding:14px 16px}
+  .fmt{grid-template-columns:minmax(0,1fr)}
+  .fmtblk .srcs{columns:1}
+}
+@media (max-width:380px){
+  .trackbar{gap:8px}
+  .tracksw{padding:5px;gap:5px}
+  .tracksw__btn{padding:8px 9px}
+  .tracksw__name{font-size:12.5px}
+  .deftog{min-width:0;padding:8px 7px}
+  .deftog__lbl{letter-spacing:.04em}
+}
