@@ -6,7 +6,10 @@ A 53-day coding-interview tracker: DSA fundamentals + all of NeetCode 150 + comp
 - ☁️ Progress, notes and solutions synced per account (Upstash Redis)
 - ⌨️ Multiple saved solutions per problem (NeetCode-style tabs)
 - 🎧 AI-consolidated audio review from your notes (your own Gemini key, stored server-side)
-- 🎯 Optional Google OA + Interview Sprint track (4-day plan dated back from your OA, 123-problem Google bank, candidate reports) — switch at the top, ☆ to make it your default
+- 🎯 Optional Google Sprint track, in two halves — switch at the top, ☆ to make it your default
+  - **OA sprint**: 4-day plan dated back from your OA, 123-problem Google bank, candidate reports
+  - **Interview sprint**: 10 days of ~3 h after the OA (readiness map; learn → redo → core → follow-up → interview rep, two mocks, STAR stories), 136-problem bank
+- 🌌 Galaxy + liquid-glass theme (daylight variant from the dock)
 - 🌐 English default, Korean toggle · 📱 mobile friendly
 
 ## Stack

@@ -2,10 +2,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { DAYS, SECTIONS, ITEMS, ITEM_CORE, TOTAL, LAST_DAY } from "@/lib/plan";
-import { GS_DAYS, GS_TOPICS, GS_BANK, GS_ITEMS, GS_PLAN_IDS, gsDefaultOA, gsFocusDay } from "@/lib/sprint";
+import {
+  GS_DAYS, GS_TOPICS, GS_BANK, GS_ITEMS, GS_PLAN_IDS, gsDefaultOA, gsFocusDay, gsOffset,
+  IV_TOPICS, IV_BANK, IV_PLAN_IDS, ivDefaultStart, ivFocusDay,
+} from "@/lib/sprint";
 import { STRINGS, WEEKDAYS } from "@/lib/i18n";
 import ItemRow from "@/components/ItemRow";
-import SprintTrack, { GS_TABS } from "@/components/SprintTrack";
+import SprintTrack from "@/components/SprintTrack";
+import InterviewTrack from "@/components/InterviewTrack";
+import { GS_TABS } from "@/components/SprintParts";
+import { IconToday, IconHeadphones, IconFold, IconUnfold, IconGear, IconSun, IconMoon, IconGlobe, IconSignOut } from "@/components/Icons";
 import SolutionsModal from "@/components/SolutionsModal";
 import SettingsModal from "@/components/SettingsModal";
 import SummaryModal from "@/components/SummaryModal";
@@ -14,9 +20,13 @@ const isoToday = () => new Date().toISOString().slice(0, 10);
 // Fresh accounts start completely empty — nothing pre-checked.
 const emptyState = () => ({ start: isoToday(), lang: "en", items: {}, dayNotes: {}, solutions: {}, summary: "", summaryDate: "" });
 const FIRST_COMPANY_KEY = DAYS.find((d) => d.company)?.key;
-// Tracks: the NeetCode 250 plan, or the optional Google OA sprint. `state.track`
+// Tracks: the NeetCode 250 plan, or the optional Google sprint. `state.track`
 // holds the user's default (missing = NeetCode); the switcher flips the view.
+// The Google sprint has two halves: the OA sprint and, once the OA is passed,
+// the 10-day Interview sprint (`state.gsSub`, synced with the account).
 const NC = "nc250", GS = "gsprint";
+const THEME_KEY = "ctt-sky"; // galaxy (dark) unless the user picked daylight
+const THEME_BG = { dark: "#05061A", light: "#EEF0FA" };
 
 export default function Tracker({ user }) {
   const [state, setState] = useState(null);
@@ -29,10 +39,11 @@ export default function Tracker({ user }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showToday, setShowToday] = useState(true);
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState("dark");
   const [preFilter, setPreFilter] = useState("all"); // "Already done" difficulty filter
   const [view, setView] = useState(null); // track on screen; opens on the user's default
   const [gsTab, setGsTabRaw] = useState("plan"); // sprint tab, remembered per device
+  const [ivPick, setIvPick] = useState(null); // day open in the Interview plan (null = today's)
 
   // pick up the theme the pre-paint script already applied
   useEffect(() => {
@@ -43,7 +54,11 @@ export default function Tracker({ user }) {
   const toggleTheme = () => {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark";
-      try { document.documentElement.setAttribute("data-theme", next); localStorage.setItem("ctt-theme", next); } catch {}
+      try {
+        document.documentElement.setAttribute("data-theme", next);
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_BG[next]);
+        localStorage.setItem(THEME_KEY, next);
+      } catch {}
       return next;
     });
   };
@@ -107,6 +122,17 @@ export default function Tracker({ user }) {
   const gsDone = useMemo(() => state ? GS_PLAN_IDS.filter((id) => state.items[id]?.done).length : 0, [state]);
   const gsHard = useMemo(() => state ? GS_BANK.filter((p) => state.items[p.id]?.diff === "h").length : 0, [state]);
   const gsPct = Math.round((gsDone / GS_PLAN_IDS.length) * 100);
+  const ivDone = useMemo(() => state ? IV_PLAN_IDS.filter((id) => state.items[id]?.done).length : 0, [state]);
+  const ivHard = useMemo(() => state ? IV_BANK.filter((p) => state.items[p.id]?.diff === "h").length : 0, [state]);
+  const ivPct = Math.round((ivDone / IV_PLAN_IDS.length) * 100);
+  // OA or Interview sprint; until picked, it's the Interview one once the OA sprint is over
+  const gsSub = state?.gsSub || (state?.gsOA && gsOffset(state.gsOA) > GS_DAYS[GS_DAYS.length - 1].off ? "iv" : "oa");
+  const isIv = isGs && gsSub === "iv";
+  const gsTrackPct = gsSub === "iv" ? ivPct : gsPct;
+  // top bar numbers follow the plan on screen
+  const stat = !isGs ? { pct, done: doneCount, total: TOTAL, hard: hardIds.length }
+    : isIv ? { pct: ivPct, done: ivDone, total: IV_PLAN_IDS.length, hard: ivHard }
+    : { pct: gsPct, done: gsDone, total: GS_PLAN_IDS.length, hard: gsHard };
 
   const todayIndex = useMemo(() => {
     if (!state) return 1;
@@ -166,18 +192,29 @@ export default function Tracker({ user }) {
   const setSummary = (text) => update((s) => { s.summary = text; s.summaryDate = new Date().toISOString(); return s; });
   const setDefaultTrack = (k) => update((s) => { s.track = k; return s; });
   const setOA = (v) => update((s) => { s.gsOA = v || gsDefaultOA(); return s; });
-  // First visit to the sprint pins its OA date (default: Day 1 = today) so the schedule stays put.
+  const setIvStart = (v) => update((s) => { s.ivStart = v || ivDefaultStart(); return s; });
+  const setGsSub = (k) => update((s) => { s.gsSub = k; return s; });
+  // First visit to a sprint pins its dates (default: Day 1 = today) so the schedule stays put.
   useEffect(() => {
-    if (view === GS && state && !state.gsOA) update((s) => { s.gsOA = gsDefaultOA(); return s; });
-  }, [view, state, update]);
+    if (view !== GS || !state) return;
+    if (gsSub === "oa" && !state.gsOA) update((s) => { s.gsOA = gsDefaultOA(); return s; });
+    if (gsSub === "iv" && !state.ivStart) update((s) => { s.ivStart = ivDefaultStart(); return s; });
+  }, [view, gsSub, state, update]);
   const resetAll = async () => {
     if (!confirm(t.resetConfirm)) return;
     const fresh = emptyState(); fresh.lang = lang; fresh.start = state.start;
-    fresh.track = state.track; fresh.gsOA = state.gsOA; // settings, not progress
+    // settings, not progress
+    fresh.track = state.track; fresh.gsOA = state.gsOA; fresh.gsSub = state.gsSub; fresh.ivStart = state.ivStart;
     setState(fresh); stateRef.current = fresh; await saveNow();
   };
 
+  // Interview plan: show a day's full plan (tab may only mount on this render)
+  const openIvDay = (key) => {
+    setGsTab("plan"); setIvPick(key);
+    setTimeout(() => document.getElementById("iv-detail")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
   const scrollToday = () => {
+    if (isIv) return openIvDay(ivFocusDay(state.ivStart || ivDefaultStart()).key);
     if (isGs) {
       const key = gsFocusDay(state.gsOA || gsDefaultOA()).key;
       setGsTab("plan");
@@ -192,7 +229,7 @@ export default function Tracker({ user }) {
   };
   const toggleAll = () => {
     const next = !allCollapsed; setAllCollapsed(next);
-    const c = {}; [...DAYS, ...GS_DAYS, ...GS_TOPICS].forEach((d) => { c[d.key] = next; }); setCollapsed(c);
+    const c = {}; [...DAYS, ...GS_DAYS, ...GS_TOPICS, ...IV_TOPICS].forEach((d) => { c[d.key] = next; }); setCollapsed(c);
   };
 
   // Reusable item row (Today panels + the sprint track); `meta` = extra badges under the title.
@@ -224,22 +261,25 @@ export default function Tracker({ user }) {
       <div className="topbar">
         <div className="topbar__in">
           <span className="brand"><b>{t.appName}</b></span>
-          <div className="topbar__bar"><div className="topbar__fill" style={{ width: (isGs ? gsPct : pct) + "%" }} /></div>
-          <span className="topbar__stat">{t.statDone} <b>{isGs ? gsDone : doneCount}</b>/{isGs ? GS_PLAN_IDS.length : TOTAL} · {t.statReview} <b>{isGs ? gsHard : hardIds.length}</b></span>
+          <div className="topbar__bar"><div className="topbar__fill" style={{ width: stat.pct + "%" }} /></div>
+          <span className="topbar__stat">{t.statDone} <b>{stat.done}</b>/{stat.total} · {t.statReview} <b>{stat.hard}</b></span>
           <div className="topbar__actions">
-            <button className="tbtn hl" onClick={() => setShowSummary(true)}>{t.reviewMaterial}</button>
-            <button className="tbtn" onClick={() => setShowSettings(true)}>{t.settings}</button>
-            <button className="tbtn" onClick={scrollToday}>{t.toToday}</button>
-            <button className="tbtn" onClick={toggleAll}>{allCollapsed ? t.expandAll : t.collapseAll}</button>
+            <button className="tbtn cy" onClick={scrollToday}><IconToday /><span>{t.toToday}</span></button>
+            <button className="tbtn hl" onClick={() => setShowSummary(true)}><IconHeadphones /><span>{t.reviewMaterial}</span></button>
+            <button className="tbtn ic" onClick={toggleAll} title={allCollapsed ? t.expandAll : t.collapseAll} aria-label={allCollapsed ? t.expandAll : t.collapseAll}>
+              {allCollapsed ? <IconUnfold /> : <IconFold />}
+            </button>
+            <button className="tbtn ic" onClick={() => setShowSettings(true)} title={t.settings} aria-label={t.settings}>
+              <IconGear />
+            </button>
           </div>
-          <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")}>{saveMsg || t.saved}</span>
         </div>
       </div>
 
       <div className="wrap">
         <div className="trackbar">
           <div className="tracksw" role="tablist" aria-label={t.trackAria}>
-            {[[NC, t.trackNc, pct], [GS, t.trackGs, gsPct]].map(([k, name, p]) => (
+            {[[NC, t.trackNc, pct], [GS, t.trackGs, gsTrackPct]].map(([k, name, p]) => (
               <button key={k} role="tab" aria-selected={view === k} className={"tracksw__btn" + (view === k ? " on" : "")} onClick={() => setView(k)}>
                 <span className="tracksw__name">{name}</span>
                 <span className="tracksw__sub">{t.trackSub(p, defTrack === k)}</span>
@@ -255,7 +295,30 @@ export default function Tracker({ user }) {
           </button>
         </div>
 
-        {isGs ? (
+        {isGs && (
+          <div className="subsw" role="tablist" aria-label={t.gsSubAria}>
+            {[["oa", gsPct], ["iv", ivPct]].map(([k, p]) => (
+              <button key={k} role="tab" aria-selected={gsSub === k} className={"subsw__btn" + (gsSub === k ? " on" : "")} onClick={() => setGsSub(k)}>
+                <span className="subsw__txt">
+                  <span className="subsw__name">{t.gsSub[k]}</span>
+                  <span className="subsw__len">{t.gsSubLen[k]}</span>
+                </span>
+                <span className="subsw__pct">{p}%</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isIv ? (
+          <InterviewTrack
+            t={t} lang={lang} state={state}
+            tab={gsTab} setTab={setGsTab}
+            collapsed={collapsed} setCollapsed={setCollapsed}
+            showToday={showToday} setShowToday={setShowToday}
+            renderItem={renderItem} onSetStart={setIvStart} setDayNote={setDayNote}
+            pick={ivPick} setPick={setIvPick} onOpenDay={openIvDay}
+          />
+        ) : isGs ? (
           <SprintTrack
             t={t} lang={lang} state={state}
             tab={gsTab} setTab={setGsTab}
@@ -292,7 +355,7 @@ export default function Tracker({ user }) {
                           ? <p className="today__empty">{t.todayAllReviewed}</p>
                           : todayDay?.items.map((i) => renderItem(i))}
                       </div>
-                      <div className="today__review">
+                      <div className="today__review spaced">
                         <h3 className="today__h">{t.reviewToday}</h3>
                         <p className="today__hint">{t.reviewSpacedHint}</p>
                         {reviewGroups.length === 0 ? (
@@ -391,16 +454,17 @@ export default function Tracker({ user }) {
         </footer>
       </div>
 
+      <span className={"saved" + (saveMsg ? " show" : "") + (saveMsg && saveMsg !== t.saved ? " err" : "")} role="status">{saveMsg || t.saved}</span>
       <div className="dock">
         <button className="dockbtn dockbtn--icon" onClick={toggleTheme} aria-label={t.themeToggle} title={t.themeToggle}>
-          {theme === "dark" ? "☀️" : "🌙"}
+          {theme === "dark" ? <IconSun size={17} /> : <IconMoon size={17} />}
         </button>
         <button className="dockbtn" onClick={toggleLang} aria-label={t.langBtn} title={t.langBtn}>
-          <span aria-hidden="true">🌐</span><span className="dockbtn__lbl">{t.langBtn}</span>
+          <IconGlobe size={16} /><span className="dockbtn__lbl">{t.langBtn}</span>
         </button>
         <div className="dock__user" title={user?.email || ""}>
           {user?.image ? <img src={user.image} alt="" /> : <span className="userchip__dot" />}
-          <button className="dockbtn" onClick={() => signOut()}>{t.signOut}</button>
+          <button className="dockbtn" onClick={() => signOut()} title={t.signOut} aria-label={t.signOut}><IconSignOut size={16} /><span className="dockbtn__lbl">{t.signOut}</span></button>
         </div>
       </div>
 
