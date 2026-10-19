@@ -1,5 +1,6 @@
 "use client";
 import { itemTitle } from "@/lib/plan";
+import { IconBook } from "@/components/Icons";
 
 function DiffButtons({ st, onSet }) {
   return (
@@ -12,7 +13,8 @@ function DiffButtons({ st, onSet }) {
 }
 
 // One checkable row (problem or task). `meta` renders under the title (track-specific badges).
-export default function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNote, onDone, onDiff, onNote, onSolutions, meta }) {
+// `onStudy` adds the Study notes button; `studySolved` = a solution is saved, so its full notes are earned.
+export default function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNote, onDone, onDiff, onNote, onSolutions, onStudy, studySolved, meta }) {
   const isProb = i.type === "p";
   // "implement …" tasks are code you write, so they get difficulty + solutions too
   const codeTask = i.type === "t" && /implement/i.test(i.t?.en || "");
@@ -30,6 +32,11 @@ export default function ItemRow({ i, t, lang, st, solCount, noteOpen, onToggleNo
         {meta}
       </div>
       <div className="item__right">
+        {onStudy && (
+          <button className={"studybtn" + (studySolved ? " solved" : "")} onClick={onStudy} title={t.studyBtn}>
+            <IconBook size={14} />{t.studyBtn}
+          </button>
+        )}
         {showControls && (
           <button className={"solbtn" + (solCount ? " has" : "")} onClick={onSolutions} title={t.solutionsBtn}>
             {"</>"}{solCount ? <span className="solcnt">{solCount}</span> : null}

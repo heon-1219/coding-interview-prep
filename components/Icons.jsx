@@ -1,4 +1,4 @@
-// Small line icons (24px grid, inherit currentColor) for the top bar and dock.
+// Small line icons (24px grid, inherit currentColor) for the top bar, dock and rows.
 const Svg = ({ size = 16, children }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{children}</svg>
@@ -33,4 +33,10 @@ export const IconGlobe = (p) => (
 );
 export const IconSignOut = (p) => (
   <Svg {...p}><path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16.5 5.5 12 10 7.5M5.5 12H15" /></Svg>
+);
+export const IconBook = (p) => (
+  <Svg {...p}><path d="M12 6.6C10.2 5.2 7.7 4.5 4.5 4.5v13c3.2 0 5.7.7 7.5 2.1 1.8-1.4 4.3-2.1 7.5-2.1v-13c-3.2 0-5.7.7-7.5 2.1zM12 6.6v13" /></Svg>
+);
+export const IconLock = (p) => (
+  <Svg {...p}><rect x="5" y="10.5" width="14" height="9.5" rx="2.2" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></Svg>
 );

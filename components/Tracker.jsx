@@ -13,6 +13,7 @@ import InterviewTrack from "@/components/InterviewTrack";
 import { GS_TABS } from "@/components/SprintParts";
 import { IconToday, IconHeadphones, IconFold, IconUnfold, IconGear, IconSun, IconMoon, IconGlobe, IconSignOut } from "@/components/Icons";
 import SolutionsModal from "@/components/SolutionsModal";
+import StudyModal from "@/components/StudyModal";
 import SettingsModal from "@/components/SettingsModal";
 import SummaryModal from "@/components/SummaryModal";
 
@@ -36,6 +37,7 @@ export default function Tracker({ user }) {
   const [allCollapsed, setAllCollapsed] = useState(false);
   const [openNotes, setOpenNotes] = useState({});
   const [solFor, setSolFor] = useState(null); // problem id
+  const [studyFor, setStudyFor] = useState(null); // problem id (Study notes)
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [showToday, setShowToday] = useState(true);
@@ -189,6 +191,17 @@ export default function Tracker({ user }) {
     update((s) => { s.lang = s.lang === "en" ? "ko" : "en"; try { localStorage.setItem("ctt-lang", s.lang); } catch {} return s; });
   };
   const setSolutions = (pid, list) => update((s) => { s.solutions[pid] = list; return s; });
+  // Study notes: hint mode until a solution with code is saved (or the user
+  // chooses to see them anyway: items[id].peek). items[id].hints = hints seen.
+  const solved = (id) => (state.solutions[id] || []).some((x) => x.code?.trim());
+  const studyOpen = (id) => solved(id) || !!state.items[id]?.peek;
+  const openStudy = (id) => {
+    setStudyFor(id);
+    // opening locked notes is asking for a hint, so hint 1 shows right away
+    if (!studyOpen(id) && !state.items[id]?.hints) update((s) => { getItem(s, id).hints = 1; return s; });
+  };
+  const showHint = (id, n) => update((s) => { const it = getItem(s, id); it.hints = Math.max(it.hints || 0, n); return s; });
+  const revealNotes = (id) => update((s) => { getItem(s, id).peek = true; return s; });
   const setSummary = (text) => update((s) => { s.summary = text; s.summaryDate = new Date().toISOString(); return s; });
   const setDefaultTrack = (k) => update((s) => { s.track = k; return s; });
   const setOA = (v) => update((s) => { s.gsOA = v || gsDefaultOA(); return s; });
@@ -232,14 +245,16 @@ export default function Tracker({ user }) {
     const c = {}; [...DAYS, ...GS_DAYS, ...GS_TOPICS, ...IV_TOPICS].forEach((d) => { c[d.key] = next; }); setCollapsed(c);
   };
 
-  // Reusable item row (Today panels + the sprint track); `meta` = extra badges under the title.
-  const renderItem = (i, meta) => (
+  // Reusable item row (Today panels + the sprint tracks); `meta` = extra badges under the title,
+  // `study` = show the Study notes button (Interview sprint problems).
+  const renderItem = (i, meta, study) => (
     <ItemRow key={i.id} i={i} t={t} lang={lang} st={state.items[i.id]} meta={meta}
       solCount={(state.solutions[i.id] || []).length}
       noteOpen={!!openNotes[i.id]}
       onToggleNote={() => setOpenNotes((o) => ({ ...o, [i.id]: !o[i.id] }))}
       onDone={() => toggleDone(i.id)} onDiff={(x) => setDiff(i.id, x)} onNote={(v) => setNote(i.id, v)}
-      onSolutions={() => setSolFor(i.id)} />
+      onSolutions={() => setSolFor(i.id)}
+      onStudy={study ? () => openStudy(i.id) : null} studySolved={study && solved(i.id)} />
   );
 
   // ── render ──
@@ -474,6 +489,17 @@ export default function Tracker({ user }) {
           solutions={state.solutions[solFor] || []}
           onChange={(list) => setSolutions(solFor, list)}
           onClose={() => setSolFor(null)}
+        />
+      )}
+      {studyFor && (
+        <StudyModal
+          t={t} lang={lang} problem={GS_ITEMS[studyFor] || ITEMS[studyFor]}
+          unlocked={studyOpen(studyFor)} peeked={!!state.items[studyFor]?.peek && !solved(studyFor)}
+          hints={state.items[studyFor]?.hints || 0} flagged={state.items[studyFor]?.diff === "h"}
+          onHint={(n) => showHint(studyFor, n)} onReveal={() => revealNotes(studyFor)}
+          onFlag={() => setDiff(studyFor, "h")}
+          onOpenSolutions={() => { setStudyFor(null); setSolFor(studyFor); }}
+          onClose={() => setStudyFor(null)}
         />
       )}
       {showSettings && <SettingsModal t={t} onClose={() => setShowSettings(false)} />}

@@ -43,7 +43,7 @@ export default function InterviewTrack({ t, lang, state, tab, setTab, collapsed,
     : { cls: "ontrack", text: t.ivDayOf(n, LAST.n) };
 
   const done = (p) => !!state.items[p.id]?.done;
-  const row = (p, mins, tag) => renderItem(p, <Meta p={p} t={t} lang={lang} mins={mins} tag={tag} />);
+  const row = (p, mins, tag) => renderItem(p, <Meta p={p} t={t} lang={lang} mins={mins} tag={tag} />, true); // + Study notes
   const partRow = (x) => row(x.p, x.m);
   const flip = (key) => setCollapsed((c) => ({ ...c, [key]: !c[key] }));
   const mins = (m) => t.gsMin(m);

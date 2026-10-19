@@ -396,6 +396,15 @@ a.item__t .ext{font-weight:400;color:var(--ink-faint);font-size:12px;margin-left
 .solbtn.has{color:var(--violet);border-color:rgba(161,147,255,.42);background:var(--violet-t)}
 .notebtn.has{color:var(--amber);border-color:rgba(255,196,107,.42);background:var(--amber-t)}
 .solcnt{background:var(--violet);color:var(--on-signal);border-radius:99px;font-family:var(--sans);font-size:10px;padding:0 5px;line-height:15px}
+/* Study notes: sky book until you've saved a solution, then gold (finished) */
+.studybtn{height:30px;padding:0 10px 0 8px;border-radius:10px;border:1px solid var(--glass-line);background:var(--hover);color:var(--ink-soft);
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;white-space:nowrap;transition:background .15s,border-color .15s,color .15s}
+.studybtn svg{color:var(--sky);flex:none}
+.studybtn:hover{color:var(--ink);background:rgba(255,255,255,.09)}
+:root[data-theme="light"] .studybtn:hover{background:rgba(38,44,110,.07)}
+.studybtn.solved{color:var(--gold);border-color:rgba(255,210,125,.42);background:var(--gold-t)}
+.studybtn.solved svg{color:inherit}
+:root[data-theme="light"] .studybtn.solved{border-color:rgba(160,104,10,.32)}
 /* felt difficulty: three coloured rings in a trough; the chosen one lights up */
 .diff{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--well);border:1px solid var(--well-line)}
 .dbtn{width:26px;height:24px;border:0;border-radius:8px;background:transparent;display:grid;place-items:center;padding:0;transition:background .15s}
@@ -477,6 +486,61 @@ footer .reset button:hover{color:var(--rose);border-color:rgba(255,124,154,.45)}
   border-radius:16px;background:rgba(3,4,16,.82);border:1px solid rgba(255,255,255,.08);color:#E9EBFA;caret-color:#62E6FF}
 .sol__code::placeholder{color:#6F7598}
 .sol__foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink-faint);margin-top:8px}
+
+/* study notes: a violet "problem type" card, then sections with a signal bar
+   each (cyan intuition · sky structures · orchid trick · mint complexity ·
+   amber pitfall). Hint mode: violet hint cards and a dashed locked panel. */
+.sn__head{align-items:flex-start}
+.sn__titles{min-width:0;display:grid;gap:4px}
+.sn__kicker{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sky)}
+.modal__card.study .modal__head h2{white-space:normal;line-height:1.25;font-size:19px}
+.sn__meta{display:flex;align-items:center;gap:8px;margin:4px 0 14px}
+.sn__meta .lv{margin:0}
+.sn__mode{font-size:11.5px;font-weight:700;line-height:1.4;padding:2px 10px;border-radius:99px;color:var(--amber);background:var(--amber-t);border:1px solid rgba(255,196,107,.3)}
+.sn__mode.open{color:var(--gold);background:var(--gold-t);border-color:rgba(255,210,125,.34)}
+.sn__state{padding:30px 6px;text-align:center;color:var(--ink-soft);display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center}
+.sn__state p{margin:0}
+.sn__wip{font-size:13px;font-weight:700;color:var(--amber);background:var(--amber-t);border:1px solid rgba(255,196,107,.3);border-radius:99px;padding:3px 13px}
+.sn__lead{margin:0 0 6px;font-size:13px;color:var(--ink-soft);line-height:1.55}
+.sn__sec{--c:var(--ink-faint);position:relative;padding:11px 2px 11px 16px}
+.sn__sec::before{content:"";position:absolute;left:0;top:14px;width:3px;height:15px;border-radius:3px;background:var(--c);box-shadow:0 0 10px var(--c)}
+.sn__sec+.sn__sec{border-top:1px solid var(--line)}
+.sn__lbl{margin:0 0 3px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--c)}
+.sn__txt{margin:0;font-size:14.5px;line-height:1.62;color:var(--ink)}
+.sn__sec.sum .sn__lbl{color:var(--ink-soft)}
+.sn__sec.idea{--c:var(--cyan)} .sn__sec.ds{--c:var(--sky)} .sn__sec.trick{--c:var(--orchid)} .sn__sec.cx{--c:var(--mint)} .sn__sec.pit{--c:var(--amber)}
+.sn__sec.cx .sn__txt{font-family:var(--mono);font-size:13px}
+.modal__card.study code{font-family:var(--mono);font-size:.87em;padding:1px 5px;border-radius:6px;background:var(--well);border:1px solid var(--well-line);
+  color:var(--ink);overflow-wrap:anywhere}
+.sn__sec.cx code{font-size:1em;padding:0;border:0;background:none}
+.sn__type{padding:13px 16px 14px;margin-bottom:4px;border-radius:16px;background:var(--violet-t);border:1px solid rgba(161,147,255,.3)}
+.sn__type .sn__lbl{color:var(--violet);margin-bottom:6px}
+.sn__typeline{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.sn__fam{flex:none;font-size:12px;font-weight:700;line-height:1.5;color:var(--on-signal);background:var(--violet);border-radius:99px;padding:1px 10px}
+.sn__variant{font-size:15px;font-weight:650;line-height:1.45;letter-spacing:-.01em;color:var(--ink)}
+.sn__hints{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:8px}
+.sn__hint{padding:11px 14px 12px;border-radius:14px;background:var(--violet-t);border:1px solid rgba(161,147,255,.26);animation:riseIn .22s cubic-bezier(.2,.8,.2,1)}
+.sn__hintn{display:block;font-size:11.5px;font-weight:700;color:var(--violet);margin-bottom:3px}
+.sn__hint p{margin:0;font-size:14.5px;line-height:1.6}
+.sn__more{margin-top:8px;width:100%;min-height:42px;border-radius:14px;border:1px dashed rgba(161,147,255,.55);background:transparent;
+  color:var(--violet);font-size:13.5px;font-weight:650;transition:background .15s}
+.sn__more:hover{background:var(--violet-t)}
+.sn__flagrow,.sn__peek{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap;font-size:12.5px;line-height:1.5;color:var(--ink-faint)}
+.sn__flagrow{margin-top:14px}
+.sn__peek{margin-top:12px;padding:10px 12px 10px 14px;border-radius:14px;color:var(--ink-soft);background:var(--amber-t);border:1px solid rgba(255,196,107,.24)}
+.sn__flag{flex:none;display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:0 13px;border-radius:99px;border:1px solid var(--glass-line);
+  background:var(--hover);color:var(--ink-soft);font-size:12.5px;font-weight:650;transition:color .15s,border-color .15s,background .15s}
+.sn__flag i{width:10px;height:10px;border-radius:50%;border:1.6px solid var(--rose)}
+.sn__flag:hover{color:var(--ink)}
+.sn__flag.on{color:var(--rose);border-color:rgba(255,124,154,.45);background:var(--rose-t)}
+.sn__flag.on i{background:var(--rose);box-shadow:0 0 8px var(--rose)}
+.sn__locked{margin-top:16px;padding:14px 16px 16px;border-radius:16px;border:1px dashed var(--glass-line);background:var(--well)}
+.sn__lockhead{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+.sn__lockchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.sn__lockchips span{font-size:11.5px;font-weight:600;color:var(--ink-faint);padding:2px 9px;border-radius:99px;border:1px solid var(--well-line);background:var(--hover)}
+.sn__locked p{margin:0 0 12px;font-size:12.5px;color:var(--ink-faint)}
+.sn__lockactions{display:flex;gap:8px;flex-wrap:wrap}
+.btn.armed{color:var(--amber);border-color:rgba(255,196,107,.5);background:var(--amber-t)}
 
 /* ── Google sprints ── */
 .gsdates{display:flex;flex-direction:column;gap:4px;padding-bottom:4px;font-size:12.5px;color:var(--ink-soft)}
